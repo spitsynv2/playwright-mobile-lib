@@ -1,0 +1,32 @@
+{
+  "name": "playwright-mobile-lib",
+  "version": "1.0.0",
+  "description": "Shared Playwright iOS Safari bridge fixture (connection, capabilities, appium input mode, unsupported-API guards, Zebrunner reporting).",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "src/"
+  ],
+  "scripts": {
+    "test": "node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && node test/screenshot-gate.test.js && node --test test/telemetry.test.js test/reporting.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github:spitsynv2/playwright-mobile-lib"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.58.0",
+    "@zebrunner/javascript-agent-playwright": "*"
+  },
+  "peerDependenciesMeta": {
+    "@zebrunner/javascript-agent-playwright": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
