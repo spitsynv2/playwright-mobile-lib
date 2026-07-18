@@ -5,7 +5,7 @@
 // a blank instead (the bridge keeps its own visibility gate as a backstop for
 // anything that slips through). No-op on local webkit.launch runs (no page.bridge).
 const fs = require('fs');
-const { wsEndpoint } = require('./capabilities');
+const { resolveWsEndpoint } = require('../../core/capabilities');
 
 // 1x1 PNG returned in place of a real capture for a backgrounded tab.
 const BLANK_PNG_BASE64 =
@@ -52,7 +52,7 @@ async function isForegroundBounded(page, timeoutMs = FOREGROUND_PROBE_TIMEOUT_MS
 // Wraps page.screenshot so unavailable iOS captures return a blank PNG.
 function installForegroundScreenshotGate(PageProto) {
   const originalScreenshot = PageProto.screenshot;
-  if (!wsEndpoint || typeof originalScreenshot !== 'function' || originalScreenshot.__iosForegroundGated) {
+  if (!resolveWsEndpoint('iOS') || typeof originalScreenshot !== 'function' || originalScreenshot.__iosForegroundGated) {
     return;
   }
   const gated = async function screenshot(options = {}) {

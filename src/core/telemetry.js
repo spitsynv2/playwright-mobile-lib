@@ -147,7 +147,7 @@ async function recordAction(kind, method, params, action) {
   try {
     reportingAvailable = reporting.isActionReportingAvailable();
   } catch {}
-  const id = `ios-${process.pid}-${startedAt}-${++actionSequence}`;
+  const id = `pwm-${process.pid}-${startedAt}-${++actionSequence}`;
   let source;
   let safeParams;
   if (reportingAvailable) {

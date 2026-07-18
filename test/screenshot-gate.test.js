@@ -7,7 +7,7 @@ const path = require('path');
 
 process.env.IOS_WS_ENDPOINT = 'ws://test/safari';
 
-const { installForegroundScreenshotGate } = require('../src/screenshot-gate');
+const { installForegroundScreenshotGate } = require('../src/platforms/ios/screenshot-gate');
 
 function makePage(screenshot, foreground = true) {
   const proto = { screenshot };

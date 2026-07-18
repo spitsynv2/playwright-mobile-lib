@@ -3,10 +3,10 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const reporting = require('../src/reporting');
-const { makeAppiumProxy } = require('../src/appium');
-const { ensureAppiumPrototypesPatched, makeBridgeProxy } = require('../src/bridge-proxy');
-const { recordAction, sanitizeMethodParams, summarize } = require('../src/telemetry');
+const reporting = require('../src/core/reporting');
+const { makeAppiumProxy } = require('../src/platforms/ios/appium');
+const { ensureAppiumPrototypesPatched, makeBridgeProxy } = require('../src/platforms/ios/bridge-proxy');
+const { recordAction, sanitizeMethodParams, summarize } = require('../src/core/telemetry');
 
 const originalAttachAction = reporting.attachAction;
 const originalAvailability = reporting.isActionReportingAvailable;

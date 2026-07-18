@@ -1,9 +1,12 @@
 const playwright = require('@playwright/test');
-const iosBridge = require('./src/ios-bridge');
-const { resolveIOSDevicePreset } = require('./src/custom-devices');
+const { test, expect } = require('./src/test');
+const { withAppiumInputMode } = require('./src/platforms/ios/appium');
+const { resolveIOSDevicePreset } = require('./src/platforms/ios/custom-devices');
 
 module.exports = {
   ...playwright,
-  ...iosBridge,
+  test,
+  expect,
+  withAppiumInputMode,
   resolveIOSDevicePreset,
 };

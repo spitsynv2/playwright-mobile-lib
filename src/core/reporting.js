@@ -89,10 +89,11 @@ function attachSessionCapabilities(sessionId, capabilities) {
   }
 }
 
-function buildIOSCapabilities(deviceInfo = {}) {
+function buildSessionCapabilities(platform, deviceInfo = {}) {
+  const isAndroid = String(platform || deviceInfo.platformName || '').toLowerCase() === 'android';
   const caps = {
-    browserName: 'Safari',
-    platformName: deviceInfo.platformName || 'iOS',
+    browserName: isAndroid ? 'Chrome' : 'Safari',
+    platformName: deviceInfo.platformName || (isAndroid ? 'Android' : 'iOS'),
   };
   if (deviceInfo.deviceName) caps.deviceName = deviceInfo.deviceName;
   if (deviceInfo.osVersion) caps.browserVersion = deviceInfo.osVersion;
@@ -106,5 +107,5 @@ module.exports = {
   attachSessionCapabilities,
   attachVideoUrl,
   attachLogUrl,
-  buildIOSCapabilities,
+  buildSessionCapabilities,
 };

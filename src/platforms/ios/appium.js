@@ -8,7 +8,7 @@
 // intercepts and routes to its op handler. Lives here as the shared primitive
 // for both the appium input-mode proxy and the page.bridge.<op> proxy.
 const BRIDGE_CALL_SENTINEL = '__pwm_bridge_call__:';
-const { recordAction } = require('./telemetry');
+const { recordAction } = require('../../core/telemetry');
 
 // A navigation can destroy the main-frame execution context mid-evaluate; the
 // bridge state the sentinel targets survives it, so re-resolve and retry rather

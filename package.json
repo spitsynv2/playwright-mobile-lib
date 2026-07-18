@@ -1,9 +1,15 @@
 {
   "name": "playwright-mobile-lib",
   "version": "1.0.0",
-  "description": "Shared Playwright iOS Safari bridge fixture (connection, capabilities, appium input mode, unsupported-API guards, Zebrunner reporting).",
+  "description": "Cross-platform Playwright mobile fixture (iOS Safari + Android Chrome): connection, capabilities, appium input mode, unsupported-API guards, Zebrunner reporting.",
   "main": "index.js",
   "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
   "files": [
     "index.js",
     "index.d.ts",
@@ -18,6 +24,7 @@
   },
   "peerDependencies": {
     "@playwright/test": ">=1.58.0",
+    "playwright": ">=1.58.0",
     "@zebrunner/javascript-agent-playwright": "*"
   },
   "peerDependenciesMeta": {

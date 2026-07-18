@@ -3,15 +3,14 @@
 // Playwright Page/Locator/Mouse/Context prototypes.
 const { bridgeCall, makeAppiumProxy, withHitTestBypass } = require('./appium');
 const { installForegroundScreenshotGate } = require('./screenshot-gate');
-const { recordAction } = require('./telemetry');
+const { recordAction } = require('../../core/telemetry');
+const { defineThrowing, defineCaveatWarning } = require('../../core/unsupported');
 const {
   UNSUPPORTED_PAGE_METHODS,
   UNSUPPORTED_LOCATOR_METHODS,
   UNSUPPORTED_MOUSE_METHODS,
   ADDINITSCRIPT_CROSS_ORIGIN_CAVEAT,
-  defineThrowing,
-  defineCaveatWarning,
-} = require('./unsupported');
+} = require('./unsupported-ios');
 
 // Ops that leave the calling page's WebInspector WS dead (iOS Settings UI
 // path terminates Safari's WebContent process). After such an op, any
