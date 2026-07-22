@@ -79,7 +79,12 @@ function buildSessionCapabilities(platform, deviceInfo = {}) {
     platformName: deviceInfo.platformName || (isAndroid ? 'Android' : 'iOS'),
   };
   if (deviceInfo.deviceName) caps.deviceName = deviceInfo.deviceName;
-  if (deviceInfo.osVersion) caps.platformVersion = deviceInfo.osVersion;
+  // Mobile Safari/Chrome version tracks the OS version; mirror it so Zebrunner
+  // shows the browser version instead of "null" for bridge sessions.
+  if (deviceInfo.osVersion) {
+    caps.platformVersion = deviceInfo.osVersion;
+    caps.browserVersion = deviceInfo.osVersion;
+  }
   return caps;
 }
 
