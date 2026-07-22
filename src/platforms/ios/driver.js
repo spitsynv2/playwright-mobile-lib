@@ -83,10 +83,9 @@ const driver = {
     ensureAppiumPrototypesPatched(page);
 
     // Handshake: pull the bridge's per-test session id at test start and push it to
-    // Zebrunner so logs + <sessionId>.mp4 are findable by session. The agent reporter
-    // presigns + downloads video/logs from this label in onTestEnd, off the test clock,
-    // so artifact I/O can never hang or abort the test. Capabilities are attached here
-    // (decoupled from video) so Browser/Platform populate even on a hang/timeout retry.
+    // Zebrunner. The agent reporter registers a test session with this id in onTestEnd;
+    // farm artifacts (video.mp4, session.log) stay on S3 and are not fetched by the test.
+    // Capabilities are attached here so Browser/Platform populate even on a hang/timeout retry.
     let sessionId = '';
     let resolvedDeviceInfo = deviceInfo;
     try {

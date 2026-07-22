@@ -1,7 +1,6 @@
-// Reports the bridge's per-test session id to Zebrunner. The agent reporter uses
-// that id to presign video/log artifacts through the orchestrator after contexts
-// close and the farm uploader has published the objects, so no AWS creds are
-// shared with the test process.
+// Reports the bridge's per-test session id to Zebrunner. The agent reporter
+// registers a Zebrunner test session with that id; farm artifacts (video.mp4,
+// session.log) stay on S3 and are not downloaded or uploaded by the test process.
 const reportingEnabled = String(process.env.REPORTING_ENABLED).toLowerCase() === 'true';
 
 let currentTest;
@@ -51,32 +50,6 @@ function isActionReportingAvailable() {
   return Boolean(available);
 }
 
-// Hand a presigned URL to the agent reporter. The current fixture normally lets
-// the reporter resolve URLs by session id through the orchestrator; this helper
-// remains for callers that already have a URL.
-function attachVideoUrl(sessionId, presignedUrl, capabilities) {
-  if (!reportingEnabled || !currentTest || !sessionId || !presignedUrl) return;
-  try {
-    currentTest.attachVideoUrl(presignedUrl, sessionId, capabilities);
-    //console.log(`reporting-agent: registered video url session=${sessionId} urlLen=${presignedUrl.length}`);
-  } catch (err) {
-    console.warn(`reporting-agent: failed to register video url session=${sessionId}: ${err.message}`);
-  }
-}
-
-// Register a per-session container-log artifact (bridge / Playwright server / inspector proxy).
-// The log slice rides the same S3 upload rail as video; the agent reporter downloads the
-// presigned URL in onTestEnd and uploads the actual file (no AWS creds / download in the test
-// process), so it shows up as a downloadable artifact instead of a clickable link.
-function attachLogUrl(name, presignedUrl) {
-  if (!reportingEnabled || !currentTest || !name || !presignedUrl) return;
-  try {
-    currentTest.attachLogUrl(name, presignedUrl);
-  } catch (err) {
-    console.warn(`reporting-agent: failed to register log url ${name}: ${err.message}`);
-  }
-}
-
 // Attach the device session capabilities (Browser/Platform) independently of any video, so
 // Zebrunner shows them even when the recording is missing (hang/timeout) or a retry's video
 // is not ready. Without a session carrying caps, Zebrunner falls back to "n/a / host OS".
@@ -105,7 +78,5 @@ module.exports = {
   isActionReportingAvailable,
   attachTestSession,
   attachSessionCapabilities,
-  attachVideoUrl,
-  attachLogUrl,
   buildSessionCapabilities,
 };
