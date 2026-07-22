@@ -7,6 +7,7 @@ const { resolveIOSDevicePreset } = require('./custom-devices');
 const {
   attachTestSession,
   attachSessionCapabilities,
+  attachDeviceLabel,
   buildSessionCapabilities,
 } = require('../../core/reporting');
 const {
@@ -109,6 +110,7 @@ const driver = {
       testInfo.annotations.push({ type: 'sessionId', description: sessionId });
       attachTestSession(sessionId);
       attachSessionCapabilities(sessionId, reportingCapabilities);
+      attachDeviceLabel(resolvedDeviceInfo.deviceName);
     }
 
     // Reopen the page in a fresh tab of the requested mode; the returned tab becomes

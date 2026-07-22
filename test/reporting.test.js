@@ -5,7 +5,7 @@ const test = require('node:test');
 
 const { buildSessionCapabilities } = require('../src/core/reporting');
 
-test('reports selected iOS version as Safari version', () => {
+test('reports selected iOS version as the platform version', () => {
   assert.deepEqual(
     buildSessionCapabilities('iOS', {
       deviceName: 'iPhone_16_Plus',
@@ -14,14 +14,14 @@ test('reports selected iOS version as Safari version', () => {
     }),
     {
       browserName: 'Safari',
-      browserVersion: '26.5',
+      platformVersion: '26.5',
       deviceName: 'iPhone_16_Plus',
       platformName: 'iOS',
     },
   );
 });
 
-test('omits Safari version when selected device version is unavailable', () => {
+test('omits platform version when selected device version is unavailable', () => {
   assert.deepEqual(buildSessionCapabilities('iOS', { deviceName: 'iPhone XR' }), {
     browserName: 'Safari',
     deviceName: 'iPhone XR',

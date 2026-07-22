@@ -62,6 +62,16 @@ function attachSessionCapabilities(sessionId, capabilities) {
   }
 }
 
+// Attach a `device:<name>` label so mobile tests are searchable by device in Zebrunner.
+function attachDeviceLabel(deviceName) {
+  if (!reportingEnabled || !currentTest || !deviceName) return;
+  try {
+    currentTest.attachLabel('device', deviceName);
+  } catch (err) {
+    console.warn(`reporting-agent: failed to attach device label: ${err.message}`);
+  }
+}
+
 function buildSessionCapabilities(platform, deviceInfo = {}) {
   const isAndroid = String(platform || deviceInfo.platformName || '').toLowerCase() === 'android';
   const caps = {
@@ -69,7 +79,7 @@ function buildSessionCapabilities(platform, deviceInfo = {}) {
     platformName: deviceInfo.platformName || (isAndroid ? 'Android' : 'iOS'),
   };
   if (deviceInfo.deviceName) caps.deviceName = deviceInfo.deviceName;
-  if (deviceInfo.osVersion) caps.browserVersion = deviceInfo.osVersion;
+  if (deviceInfo.osVersion) caps.platformVersion = deviceInfo.osVersion;
   return caps;
 }
 
@@ -78,5 +88,6 @@ module.exports = {
   isActionReportingAvailable,
   attachTestSession,
   attachSessionCapabilities,
+  attachDeviceLabel,
   buildSessionCapabilities,
 };
