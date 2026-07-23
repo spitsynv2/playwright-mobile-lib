@@ -80,6 +80,7 @@ function buildSessionCapabilities(platform, deviceInfo = {}) {
   };
   if (deviceInfo.deviceName) caps.deviceName = deviceInfo.deviceName;
   if (deviceInfo.osVersion) caps.platformVersion = deviceInfo.osVersion;
+  if (deviceInfo.browserVersion) caps.browserVersion = deviceInfo.browserVersion;
   return caps;
 }
 

@@ -14,6 +14,13 @@ const {
 } = require('../../core/capabilities');
 const { defineThrowing } = require('../../core/unsupported');
 const { UNSUPPORTED_PAGE_METHODS } = require('./unsupported-android');
+const { makeBridgeProxy } = require('./bridge-proxy');
+const {
+  attachTestSession,
+  attachSessionCapabilities,
+  attachDeviceLabel,
+  buildSessionCapabilities,
+} = require('../../core/reporting');
 
 const adbHost = process.env.ADB_SERVER_HOST || '127.0.0.1';
 const adbPort = parseInt(process.env.ADB_SERVER_PORT || '5037', 10);
@@ -94,7 +101,25 @@ function ensureAndroidPrototypesPatched(probePage) {
   const PageProto = Object.getPrototypeOf(probePage);
   if (patchedAndroidPrototypes.has(PageProto)) return;
   defineThrowing(PageProto, 'Page', UNSUPPORTED_PAGE_METHODS);
+  Object.defineProperty(PageProto, 'bridge', {
+    configurable: true,
+    get() { return makeBridgeProxy(this); },
+  });
   patchedAndroidPrototypes.add(PageProto);
+}
+
+// The Chrome build the launched context runs on, read from the device package
+// manager over adb so Zebrunner reporting shows the real browserVersion.
+const contextBrowserVersion = new WeakMap();
+
+async function readBrowserVersion(connection, pkg) {
+  try {
+    const out = (await connection.shell(`dumpsys package ${pkg} | grep versionName`)).toString();
+    const match = out.match(/versionName=(\S+)/);
+    return match ? match[1] : '';
+  } catch {
+    return '';
+  }
 }
 
 const driver = {
@@ -140,22 +165,58 @@ const driver = {
     const caps = effectiveCapabilities(capabilities);
     // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
-      await connection.shell('am force-stop com.android.chrome');
-      return connection.launchBrowser({ ...buildLaunchBrowserOptions(caps), ...extraContextOptions });
+      const pkg = caps.pkg || 'com.android.chrome';
+      await connection.shell(`am force-stop ${pkg}`);
+      const context = await connection.launchBrowser({ ...buildLaunchBrowserOptions(caps), ...extraContextOptions });
+      contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
+      return context;
     }
     return connection.newContext({ ...preset, ...extraContextOptions });
   },
 
-  async createPage(context) {
+  async createPage(context, { deviceInfo, testInfo } = {}) {
     const page = await context.newPage();
     ensureAndroidPrototypesPatched(page);
+
+    // Handshake: pull the bridge's per-test session id and device metadata at test
+    // start and push them to Zebrunner. On a local/ADB run (no bridge) the sentinel
+    // evaluate throws and is swallowed, leaving sessionId empty.
+    let sessionId = '';
+    let resolvedDeviceInfo = deviceInfo || { platformName: 'Android' };
+    try {
+      const rawDeviceInfo = await page.bridge.getDeviceInfo();
+      const bridgeDeviceInfo = typeof rawDeviceInfo === 'string'
+        ? JSON.parse(rawDeviceInfo)
+        : rawDeviceInfo;
+      if (bridgeDeviceInfo && typeof bridgeDeviceInfo === 'object') {
+        resolvedDeviceInfo = {
+          deviceName: bridgeDeviceInfo.deviceName || resolvedDeviceInfo.deviceName,
+          platformName: bridgeDeviceInfo.platformName || resolvedDeviceInfo.platformName,
+          osVersion: bridgeDeviceInfo.osVersion || resolvedDeviceInfo.osVersion,
+        };
+      }
+    } catch {}
+    const browserVersion = contextBrowserVersion.get(context) || '';
+    if (browserVersion) resolvedDeviceInfo = { ...resolvedDeviceInfo, browserVersion };
+    try {
+      sessionId = await page.bridge.getSessionId();
+    } catch {}
+    if (sessionId && testInfo) {
+      const reportingCapabilities = buildSessionCapabilities('Android', resolvedDeviceInfo);
+      testInfo.annotations.push({ type: 'sessionId', description: sessionId });
+      attachTestSession(sessionId);
+      attachSessionCapabilities(sessionId, reportingCapabilities);
+      attachDeviceLabel(resolvedDeviceInfo.deviceName);
+    }
     return page;
   },
 
-  // Attach a failure screenshot after the test body (the iOS bridge owns its own
-  // artifact rail; Android has none, so capture here on failure).
+  // On a farm/bridge run the bridge owns the artifact rail (video + session.log on
+  // S3 via the recording marker); a local or direct-ADB run has none, so capture a
+  // failure screenshot there instead.
   async onPageTeardown(page, testInfo) {
     if (testInfo.status === testInfo.expectedStatus || page.isClosed()) return;
+    if (resolveWsEndpoint('Android')) return;
     try {
       const screenshotPath = testInfo.outputPath('failure.png');
       const buffer = await page.screenshot({ path: screenshotPath, fullPage: true, timeout: 10_000 });
