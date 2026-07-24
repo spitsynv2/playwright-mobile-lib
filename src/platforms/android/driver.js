@@ -29,6 +29,34 @@ const omitDriverInstall = process.env.ANDROID_OMIT_DRIVER_INSTALL === 'true';
 // Fallback preset for local emulation when the caps device is unknown to Playwright.
 const DEFAULT_LOCAL_ANDROID_DEVICE = 'Pixel 7';
 
+// Default mirrors the iOS bridge (`private`); on Android this is best-effort
+// (--incognito may be ignored). See android_browsing_modes plan for parity.
+const DEFAULT_ANDROID_BROWSING_MODE = 'private';
+const BROWSING_MODES = new Set([
+  'public', 'private', 'single-tab-public', 'single-tab-private',
+]);
+
+// Prepended to launchBrowser args so a relaunched Chrome does not restore the
+// previous test's growing tab set (support varies by Chrome build).
+const SESSION_RESTORE_DISABLE_ARGS = [
+  '--disable-restore-session-state',
+  '--no-restore-session-state',
+];
+
+function normalizeBrowsingMode(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'single-tab') return 'single-tab-public';
+  return BROWSING_MODES.has(v) ? v : DEFAULT_ANDROID_BROWSING_MODE;
+}
+
+function isSingleTab(mode) {
+  return mode === 'single-tab-public' || mode === 'single-tab-private';
+}
+
+function isPrivateMode(mode) {
+  return mode === 'private' || mode === 'single-tab-private';
+}
+
 // launchBrowser() option keys accepted from capabilities (a subset of
 // BrowserContextOptions honored by the _android Chrome context).
 const LAUNCH_BROWSER_KEYS = [
@@ -48,6 +76,11 @@ function buildLaunchBrowserOptions(caps) {
   for (const key of LAUNCH_BROWSER_KEYS) {
     if (caps[key] !== undefined) opts[key] = caps[key];
   }
+  const mode = normalizeBrowsingMode(caps.browsingMode);
+  const defaultArgs = [...SESSION_RESTORE_DISABLE_ARGS];
+  // Best-effort private isolation; Chrome for Android may ignore --incognito.
+  if (isPrivateMode(mode)) defaultArgs.push('--incognito');
+  opts.args = [...defaultArgs, ...(Array.isArray(caps.args) ? caps.args : [])];
   return opts;
 }
 
@@ -112,6 +145,10 @@ function ensureAndroidPrototypesPatched(probePage) {
 // manager over adb so Zebrunner reporting shows the real browserVersion.
 const contextBrowserVersion = new WeakMap();
 
+// Resolved browsing mode per context, so createPage can decide tab reuse without
+// re-reading capabilities from the fixture.
+const contextBrowsingMode = new WeakMap();
+
 async function readBrowserVersion(connection, pkg) {
   try {
     const out = (await connection.shell(`dumpsys package ${pkg} | grep versionName`)).toString();
@@ -163,19 +200,43 @@ const driver = {
 
   async createContext(connection, { preset, extraContextOptions, capabilities }) {
     const caps = effectiveCapabilities(capabilities);
+    const mode = normalizeBrowsingMode(caps.browsingMode);
     // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
       await connection.shell(`am force-stop ${pkg}`);
       const context = await connection.launchBrowser({ ...buildLaunchBrowserOptions(caps), ...extraContextOptions });
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
+      contextBrowsingMode.set(context, mode);
       return context;
     }
-    return connection.newContext({ ...preset, ...extraContextOptions });
+    const context = await connection.newContext({ ...preset, ...extraContextOptions });
+    contextBrowsingMode.set(context, mode);
+    return context;
+  },
+
+  // Prune CDP-visible tabs before context.close() so a relaunched Chrome has
+  // nothing to restore; leftover on-device tabs are a GUI artifact close leaves.
+  // Gated on capabilities.closeTabAfterTest (default true).
+  async onContextTeardown(context, { capabilities } = {}) {
+    const caps = effectiveCapabilities(capabilities);
+    if (caps.closeTabAfterTest === false) return;
+    try {
+      const pages = typeof context.pages === 'function' ? context.pages() : [];
+      for (const p of pages) {
+        await p.close().catch(() => {});
+      }
+    } catch {}
   },
 
   async createPage(context, { deviceInfo, testInfo } = {}) {
-    const page = await context.newPage();
+    const mode = contextBrowsingMode.get(context) || DEFAULT_ANDROID_BROWSING_MODE;
+    const existing = typeof context.pages === 'function' ? context.pages() : [];
+    // Single-tab modes reuse the launchBrowser page instead of adding one; other
+    // modes open a fresh tab per page (Playwright #26800).
+    const page = isSingleTab(mode) && existing.length > 0
+      ? existing[0]
+      : await context.newPage();
     ensureAndroidPrototypesPatched(page);
 
     // Handshake: pull the bridge's per-test session id and device metadata at test

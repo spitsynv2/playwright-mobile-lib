@@ -43,7 +43,15 @@ export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | '
 /** Per-session container log streams (iOS): the bridge, Playwright server, and inspector proxy. */
 export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
 
-/** iOS Safari tab/browsing mode requested at connect time. */
+/**
+ * Tab/browsing mode requested at connect time.
+ *
+ * iOS Safari supports all four with full isolation. Android Chrome supports a
+ * documented subset: `single-tab-*` reuses the launched tab (no growth),
+ * `public` opens a fresh tab per page. `private` / `single-tab-private` pass
+ * `--incognito` best-effort — Chrome for Android may ignore it, so treat
+ * private isolation as not guaranteed there.
+ */
 export type BrowsingMode = 'public' | 'private' | 'single-tab-public' | 'single-tab-private';
 
 /**
@@ -62,11 +70,11 @@ export interface Capabilities {
   serial?: string;
   /** OS version pool-match filter. */
   osVersion?: string;
-  /** iOS Safari tab/browsing mode. iOS only. */
+  /** Tab/browsing mode. Full parity on iOS; documented subset on Android. Defaults to `private` on both. */
   browsingMode?: BrowsingMode;
   /** iOS: skip the between-tests Safari cleanup. */
   skipSafariCleanup?: boolean;
-  /** iOS: close the Safari tab after each test. */
+  /** Close the tab after each test. iOS closes the native tab; Android prunes tabs before context close. */
   closeTabAfterTest?: boolean;
   /** iOS: bridge nav-kick retry gate. */
   navKickEnabled?: boolean;

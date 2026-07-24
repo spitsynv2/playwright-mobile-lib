@@ -54,6 +54,12 @@ const test = base.extend({
     try {
       await use(context);
     } finally {
+      // Driver-owned pre-close cleanup (Android prunes tabs); best-effort.
+      if (typeof _driver.onContextTeardown === 'function') {
+        try {
+          await _driver.onContextTeardown(context, { capabilities });
+        } catch {}
+      }
       // Connection may already be gone; closing a dead context throws.
       try {
         await context.close();
