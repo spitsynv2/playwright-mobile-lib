@@ -57,6 +57,31 @@ function isPrivateMode(mode) {
   return mode === 'private' || mode === 'single-tab-private';
 }
 
+// Chrome activity that opens an incognito tab; the only CDP-visible incognito
+// path on Android (there is no launch/newPage incognito flag).
+const INCOGNITO_LAUNCHER = 'org.chromium.chrome.browser.incognito.IncognitoTabLauncher';
+const INCOGNITO_PAGE_TIMEOUT_MS = 10_000;
+
+// Open an incognito tab and adopt it as the context's sole page. Returns the
+// incognito Page, or null when it never surfaced (caller falls back to the
+// normal profile so private mode degrades gracefully instead of failing).
+async function openIncognitoPage(connection, context, pkg) {
+  const before = new Set(context.pages());
+  const arrival = context.waitForEvent('page', { timeout: INCOGNITO_PAGE_TIMEOUT_MS }).catch(() => null);
+  try {
+    await connection.shell(`am start -n ${pkg}/${INCOGNITO_LAUNCHER}`);
+  } catch {
+    return null;
+  }
+  let incognito = await arrival;
+  if (!incognito) incognito = context.pages().find((p) => !before.has(p)) || null;
+  if (!incognito) return null;
+  for (const p of context.pages()) {
+    if (p !== incognito) await p.close().catch(() => {});
+  }
+  return incognito;
+}
+
 // launchBrowser() option keys accepted from capabilities (a subset of
 // BrowserContextOptions honored by the _android Chrome context).
 const LAUNCH_BROWSER_KEYS = [
@@ -76,11 +101,9 @@ function buildLaunchBrowserOptions(caps) {
   for (const key of LAUNCH_BROWSER_KEYS) {
     if (caps[key] !== undefined) opts[key] = caps[key];
   }
-  const mode = normalizeBrowsingMode(caps.browsingMode);
-  const defaultArgs = [...SESSION_RESTORE_DISABLE_ARGS];
-  // Best-effort private isolation; Chrome for Android may ignore --incognito.
-  if (isPrivateMode(mode)) defaultArgs.push('--incognito');
-  opts.args = [...defaultArgs, ...(Array.isArray(caps.args) ? caps.args : [])];
+  // Private isolation is handled post-launch via IncognitoTabLauncher (Chrome for
+  // Android has no CDP incognito flag), not through launch args.
+  opts.args = [...SESSION_RESTORE_DISABLE_ARGS, ...(Array.isArray(caps.args) ? caps.args : [])];
   return opts;
 }
 
@@ -208,6 +231,9 @@ const driver = {
       const context = await connection.launchBrowser({ ...buildLaunchBrowserOptions(caps), ...extraContextOptions });
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
       contextBrowsingMode.set(context, mode);
+      if (isPrivateMode(mode) && !(await openIncognitoPage(connection, context, pkg))) {
+        console.warn(`android: incognito tab did not surface for mode '${mode}'; continuing in normal profile`);
+      }
       return context;
     }
     const context = await connection.newContext({ ...preset, ...extraContextOptions });
@@ -217,10 +243,11 @@ const driver = {
 
   // Prune CDP-visible tabs before context.close() so a relaunched Chrome has
   // nothing to restore; leftover on-device tabs are a GUI artifact close leaves.
-  // Gated on capabilities.closeTabAfterTest (default true).
+  // Mirrors iOS: runs only when closeTabAfterTest (default true) and not single-tab.
   async onContextTeardown(context, { capabilities } = {}) {
     const caps = effectiveCapabilities(capabilities);
     if (caps.closeTabAfterTest === false) return;
+    if (isSingleTab(contextBrowsingMode.get(context) || DEFAULT_ANDROID_BROWSING_MODE)) return;
     try {
       const pages = typeof context.pages === 'function' ? context.pages() : [];
       for (const p of pages) {
@@ -232,11 +259,10 @@ const driver = {
   async createPage(context, { deviceInfo, testInfo } = {}) {
     const mode = contextBrowsingMode.get(context) || DEFAULT_ANDROID_BROWSING_MODE;
     const existing = typeof context.pages === 'function' ? context.pages() : [];
-    // Single-tab modes reuse the launchBrowser page instead of adding one; other
-    // modes open a fresh tab per page (Playwright #26800).
-    const page = isSingleTab(mode) && existing.length > 0
-      ? existing[0]
-      : await context.newPage();
+    // Reuse the existing tab for single-tab modes and for private (newPage would
+    // open a non-incognito tab); only `public` opens a fresh tab per page (#26800).
+    const reuseFirst = existing.length > 0 && (isSingleTab(mode) || isPrivateMode(mode));
+    const page = reuseFirst ? existing[0] : await context.newPage();
     ensureAndroidPrototypesPatched(page);
 
     // Handshake: pull the bridge's per-test session id and device metadata at test

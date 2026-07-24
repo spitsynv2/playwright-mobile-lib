@@ -48,9 +48,10 @@ export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
  *
  * iOS Safari supports all four with full isolation. Android Chrome supports a
  * documented subset: `single-tab-*` reuses the launched tab (no growth),
- * `public` opens a fresh tab per page. `private` / `single-tab-private` pass
- * `--incognito` best-effort — Chrome for Android may ignore it, so treat
- * private isolation as not guaranteed there.
+ * `public` opens a fresh tab per page. `private` / `single-tab-private` open a
+ * real incognito tab via Chrome's IncognitoTabLauncher and reuse it (newPage
+ * would open a non-incognito tab); if that tab fails to surface on the device's
+ * Chrome build, the run falls back to the normal profile.
  */
 export type BrowsingMode = 'public' | 'private' | 'single-tab-public' | 'single-tab-private';
 
