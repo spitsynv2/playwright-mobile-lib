@@ -183,6 +183,28 @@ const contextBrowserVersion = new WeakMap();
 // re-reading capabilities from the fixture.
 const contextBrowsingMode = new WeakMap();
 
+// ArtifactsRecorder scans only chromium/firefox/webkit `_contexts`, so launchBrowser()
+// contexts get no `use.screenshot` capture and newContext() ones must not be captured twice.
+const contextsWithoutArtifactRail = new WeakSet();
+
+const SCREENSHOT_TIMEOUT_MS = 10_000;
+
+function resolveScreenshotOption(testInfo) {
+  const configured = testInfo?.project?.use?.screenshot;
+  if (!configured) return { mode: 'off', options: {} };
+  if (typeof configured === 'string') return { mode: configured, options: {} };
+  const { mode, ...options } = configured;
+  return { mode: mode || 'off', options };
+}
+
+function shouldCaptureScreenshot(mode, testInfo) {
+  if (mode === 'on') return true;
+  const failed = testInfo.status !== testInfo.expectedStatus;
+  if (mode === 'only-on-failure') return failed;
+  if (mode === 'on-first-failure') return failed && testInfo.retry === 0;
+  return false;
+}
+
 async function readBrowserVersion(connection, pkg) {
   try {
     const out = (await connection.shell(`dumpsys package ${pkg} | grep versionName`)).toString();
@@ -242,6 +264,7 @@ const driver = {
       const context = await connection.launchBrowser({ ...buildLaunchBrowserOptions(caps), ...extraContextOptions });
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
       contextBrowsingMode.set(context, mode);
+      contextsWithoutArtifactRail.add(context);
       if (isPrivateMode(mode) && !(await openIncognitoPage(connection, context, pkg))) {
         console.warn(`android: incognito tab did not surface for mode '${mode}'; continuing in normal profile`);
       }
@@ -309,16 +332,17 @@ const driver = {
     return page;
   },
 
-  // On a farm/bridge run the bridge owns the artifact rail (video + session.log on
-  // S3 via the recording marker); a local or direct-ADB run has none, so capture a
-  // failure screenshot there instead.
   async onPageTeardown(page, testInfo) {
-    if (testInfo.status === testInfo.expectedStatus || page.isClosed()) return;
-    if (resolveWsEndpoint('Android')) return;
+    if (page.isClosed() || !contextsWithoutArtifactRail.has(page.context())) return;
+    const { mode, options } = resolveScreenshotOption(testInfo);
+    if (!shouldCaptureScreenshot(mode, testInfo)) return;
     try {
-      const screenshotPath = testInfo.outputPath('failure.png');
-      const buffer = await page.screenshot({ path: screenshotPath, fullPage: true, timeout: 10_000 });
-      await testInfo.attach('failure-screenshot', { body: buffer, contentType: 'image/png' });
+      const buffer = await page.screenshot({
+        ...options,
+        caret: 'initial',
+        timeout: SCREENSHOT_TIMEOUT_MS,
+      });
+      await testInfo.attach('screenshot', { body: buffer, contentType: 'image/png' });
     } catch {}
   },
 };
