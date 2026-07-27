@@ -43,6 +43,13 @@ const SESSION_RESTORE_DISABLE_ARGS = [
   '--no-restore-session-state',
 ];
 
+// Chrome sets FLAG_SECURE on incognito windows, which blacks out the farm's screen
+// recording. CDPScreenshotNewSurface is repeated because Playwright emits its own
+// --enable-features before ours and Chrome keeps only the last occurrence.
+const SCREEN_CAPTURE_FEATURE_ARGS = [
+  '--enable-features=CDPScreenshotNewSurface,IncognitoScreenshot,ImprovedIncognitoScreenshot',
+];
+
 function normalizeBrowsingMode(value) {
   const v = String(value || '').trim().toLowerCase();
   if (v === 'single-tab') return 'single-tab-public';
@@ -103,7 +110,11 @@ function buildLaunchBrowserOptions(caps) {
   }
   // Private isolation is handled post-launch via IncognitoTabLauncher (Chrome for
   // Android has no CDP incognito flag), not through launch args.
-  opts.args = [...SESSION_RESTORE_DISABLE_ARGS, ...(Array.isArray(caps.args) ? caps.args : [])];
+  opts.args = [
+    ...SESSION_RESTORE_DISABLE_ARGS,
+    ...SCREEN_CAPTURE_FEATURE_ARGS,
+    ...(Array.isArray(caps.args) ? caps.args : []),
+  ];
   return opts;
 }
 
