@@ -115,18 +115,25 @@ no environment-variable fallbacks for device capabilities.
 | `deviceName` | `string` | Device pool-match filter, such as `iPhone 16 Plus` or `Pixel 7`. Required for iOS device runs; also selects the local emulation preset. |
 | `deviceUuid` | `string` | iOS device UDID pool-match filter. |
 | `osVersion` | `string` | OS-version pool-match filter. |
-| `browsingMode` | `'public' \| 'private' \| 'single-tab-public' \| 'single-tab-private'` | Tab/browsing mode requested at connect time. Defaults to `private`. |
+| `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip between-test Safari cleanup. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. |
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
-| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | iOS only: per-stream session log verbosity for reporting. `LogLevel` is `off`, `fatal`, `error`, `warn`, `info`, `debug`, or `trace`. |
+| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | iOS only: per-component verbosity for the combined farm `session.log`. `off` removes that source from the bundle; other values are `fatal`, `error`, `warn`, `info`, `debug`, or `trace`. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
 reuses one tab for the whole run instead of opening a tab per page. iOS honors
 all four modes with full isolation. On Android, `private` is best-effort: where
 the device's browser cannot provide an isolated tab, the run continues in the
 normal profile with a warning instead of failing.
+
+`browsingMode: process.env.BROWSING_MODE || 'private'` needs no cast. The
+library accepts `public`, `private`, `single-tab-public`,
+`single-tab-private`, and the legacy `single-tab` alias, ignoring surrounding
+case and whitespace during validation. Any other non-empty value throws when
+session setup starts, before the orchestrator or Android launcher can silently
+fall back to its default mode.
 
 On Android, `capabilities` also accepts the context options the launched Chrome
 honors (`viewport`, `locale`, `timezoneId`, `geolocation`, `permissions`,
@@ -280,6 +287,14 @@ declares both a top-level `types` entry and an export-map `types` condition, and
 capabilities, option fixtures, and the platform-specific page extensions all get
 IDE documentation automatically.
 
+In a checked JavaScript config, keep `capabilities` inline under
+`defineConfig({ projects: [...] })` to receive contextual typing without a
+JSDoc annotation. Extracting the object into a standalone `const` widens literal
+values such as `'iOS'`; annotate that standalone object as `Capabilities` if
+extraction is necessary. Environment-derived `browsingMode` and gate strings
+remain valid inputs; `browsingMode` is checked by the library when session
+setup begins.
+
 One JavaScript caveat is independent of this library: a parameter on a plain
 helper such as `function helper(page) {}` is implicitly `any`, so it cannot
 inherit IntelliSense from the fixture callback that calls it. Prefer TypeScript,
@@ -302,8 +317,9 @@ async function helper(page) {
 
 When `REPORTING_ENABLED=true` and the optional Zebrunner package is installed,
 each test attaches its device capabilities and a session label to the current
-Zebrunner test. The reporter uses that session to resolve device video and log
-artifacts after the test; artifacts are never downloaded by the test process.
+Zebrunner test. The reporter registers a Zebrunner test session with the bridge
+session ID. Farm `video.mp4` and combined `session.log` artifacts remain in farm
+storage; the test process and reporter do not download or re-upload them.
 
 Structured actions are recorded for page creation, navigation, `page.bridge.*`,
 `page.setBrowsingMode()`, and `page.appium.*` / `locator.appium.*` when the
