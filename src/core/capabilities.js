@@ -63,6 +63,17 @@ function effectiveCapabilities(capabilities) {
   return capabilities || {};
 }
 
+// Gate capabilities ride the connect header, where the orchestrator also accepts
+// the quoted 'true'/'false' forms; a local reader must resolve them the same way
+// or an env-driven string would land on the wrong branch. undefined = unset.
+function gateFlag(value) {
+  if (typeof value === 'boolean') return value;
+  const v = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
+  if (v === 'true' || v === '1') return true;
+  if (v === 'false' || v === '0') return false;
+  return undefined;
+}
+
 // Optional Authorization for an orchestrator behind an auth proxy. Precedence:
 // a raw header override, then a bearer token, then basic user/password.
 function buildAuthHeader() {
@@ -123,6 +134,7 @@ module.exports = {
   buildConnectHeaders,
   defaultCapabilities,
   effectiveCapabilities,
+  gateFlag,
   activeSessionLogs,
   slowMoMs,
   connectTimeoutMs,

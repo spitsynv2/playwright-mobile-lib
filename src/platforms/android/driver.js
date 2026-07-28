@@ -9,6 +9,7 @@ const {
   resolveWsEndpoint,
   buildConnectHeaders,
   effectiveCapabilities,
+  gateFlag,
   connectTimeoutMs,
   slowMoMs,
 } = require('../../core/capabilities');
@@ -280,7 +281,7 @@ const driver = {
   // Mirrors iOS: runs only when closeTabAfterTest (default true) and not single-tab.
   async onContextTeardown(context, { capabilities } = {}) {
     const caps = effectiveCapabilities(capabilities);
-    if (caps.closeTabAfterTest === false) return;
+    if (gateFlag(caps.closeTabAfterTest) === false) return;
     if (isSingleTab(contextBrowsingMode.get(context) || DEFAULT_ANDROID_BROWSING_MODE)) return;
     try {
       const pages = typeof context.pages === 'function' ? context.pages() : [];

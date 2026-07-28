@@ -2,21 +2,27 @@
   "name": "playwright-mobile-lib",
   "version": "1.0.0",
   "description": "Cross-platform Playwright mobile fixture (iOS Safari + Android Chrome): connection, capabilities, appium input mode, unsupported-API guards, Zebrunner reporting.",
-  "main": "index.js",
+  "private": true,
+  "main": "dist/index.js",
   "types": "index.d.ts",
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "default": "./index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
-    "index.js",
-    "index.d.ts",
-    "src/"
+    "dist",
+    "index.d.ts"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "test": "node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && node test/screenshot-gate.test.js && node --test test/telemetry.test.js test/reporting.test.js"
+    "build": "esbuild index.js --bundle --platform=node --target=node22 --format=cjs --minify --legal-comments=none --packages=external --outfile=dist/index.js",
+    "prepare": "npm run build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run build && npm run typecheck && node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && node test/screenshot-gate.test.js && node --test test/telemetry.test.js test/reporting.test.js test/capabilities.test.js test/bundle.test.js"
   },
   "repository": {
     "type": "git",
@@ -24,16 +30,20 @@
   },
   "peerDependencies": {
     "@playwright/test": ">=1.58.0",
-    "playwright": ">=1.58.0",
-    "@zebrunner/javascript-agent-playwright": "*"
+    "@zebrunner/javascript-agent-playwright": "*",
+    "playwright": ">=1.58.0"
   },
   "peerDependenciesMeta": {
     "@zebrunner/javascript-agent-playwright": {
       "optional": true
     }
   },
-  "license": "MIT",
+  "license": "UNLICENSED",
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.62.0",
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.28.1",
+    "playwright": "^1.62.0",
+    "typescript": "^7.0.2"
   }
 }
