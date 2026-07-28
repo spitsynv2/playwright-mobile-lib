@@ -83,6 +83,12 @@ const envDrivenGates: Capabilities = {
   clickNavRetriesEnabled: true,
 };
 
+// An env variable reaches browsingMode without a cast; a typo throws at runtime.
+const envDrivenMode: Capabilities = {
+  platformName: 'iOS',
+  browsingMode: process.env.BROWSING_MODE || 'private',
+};
+
 // The legacy alias still type-checks, deprecated but not an error.
 const legacyMode: Capabilities = { platformName: 'Android', browsingMode: 'single-tab' };
 
@@ -96,6 +102,7 @@ export default defineConfig({
     { name: 'other', use: { capabilities: otherDevice } },
     { name: 'legacy', use: { capabilities: legacyMode } },
     { name: 'env-gates', use: { capabilities: envDrivenGates } },
+    { name: 'env-mode', use: { capabilities: envDrivenMode } },
   ],
 });
 

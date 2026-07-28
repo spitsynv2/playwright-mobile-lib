@@ -3,10 +3,10 @@
 // directive and `npm run typecheck` fails.
 import { test, defineConfig, type Capabilities } from '../../index';
 
-const unknownBrowsingMode: Capabilities = {
+const wrongBrowsingModeType: Capabilities = {
   platformName: 'iOS',
-  // @ts-expect-error not a browsing mode
-  browsingMode: 'incognito',
+  // @ts-expect-error a mode is a string, not a boolean
+  browsingMode: true,
 };
 
 const unknownPlatform: Capabilities = {
@@ -52,7 +52,7 @@ test('signatures of blocked APIs are still enforced', async ({ page }) => {
 });
 
 export {
-  unknownBrowsingMode,
+  wrongBrowsingModeType,
   unknownPlatform,
   missingPlatform,
   wrongArgsType,

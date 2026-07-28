@@ -43,7 +43,7 @@ export function resolveIOSDevicePreset(
  */
 export function withAppiumInputMode<T>(page: Page, fn: () => Promise<T> | T): Promise<T>;
 
-/** Per-session container log verbosity. `'off'` drops that log from reporting. */
+/** Per-session container log verbosity. `'off'` removes that source from the combined session log. */
 export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 /**
@@ -53,7 +53,7 @@ export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | '
  */
 export type GateFlag = boolean | 'true' | 'false' | (string & {});
 
-/** Per-session container log streams (iOS): the bridge, Playwright server, and inspector proxy. */
+/** Component sources for the combined iOS session log. */
 export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
 
 /**
@@ -144,8 +144,14 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   serial?: string;
   /** OS version pool-match filter. */
   osVersion?: string;
-  /** Tab/browsing mode. Full parity on iOS; documented subset on Android. Defaults to `private` on both. */
-  browsingMode?: BrowsingMode;
+  /**
+   * Tab/browsing mode. Full parity on iOS; documented subset on Android.
+   * Defaults to `private` on both.
+   *
+   * Any string is accepted so an environment variable can be passed through
+   * unparsed; an unrecognized mode throws when the session starts.
+   */
+  browsingMode?: BrowsingMode | (string & {});
   /** iOS: skip the between-tests Safari cleanup. */
   skipSafariCleanup?: GateFlag;
   /** Close the tab after each test. iOS closes the native tab; Android prunes tabs before context close. */
@@ -154,7 +160,7 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   navKickEnabled?: GateFlag;
   /** iOS: bridge click-nav retry gate. */
   clickNavRetriesEnabled?: GateFlag;
-  /** iOS: per-stream container log verbosity for reporting. */
+  /** iOS: per-component verbosity for the combined farm `session.log`. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
 }
 

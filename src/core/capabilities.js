@@ -4,11 +4,10 @@
 // them. There are no single-env capability fallbacks: multi-device/multi-launch
 // runs declare one project per device, so a global env can't address them.
 
-// Per-session container logs uploaded alongside video.mp4. Names match the bridge
-// op arg / S3 object basename and become the attached <name>.log filename. Inclusion
-// is controlled per type via capabilities.logLevels (e.g. { bridge: 'debug',
-// inspector: 'off' }); a level of 'off' drops that log type from reporting. An unset
-// level keeps the prior "attach all three" behavior.
+// Component sources for the farm's combined session.log. Verbosity is controlled
+// per source via capabilities.logLevels (e.g. { bridge: 'debug',
+// inspector: 'off' }); a level of 'off' removes that source from the bundle. An
+// unset level keeps the orchestrator default.
 const SESSION_LOG_NAMES = ['bridge', 'pwserver', 'inspector'];
 const VALID_LOG_LEVELS = new Set(['off', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']);
 
@@ -59,8 +58,25 @@ function resolveWsEndpoint(platform) {
 // logLevels) in `use: { capabilities }`.
 const defaultCapabilities = { platformName: 'iOS' };
 
+const BROWSING_MODES = new Set([
+  'public', 'private', 'single-tab-public', 'single-tab-private', 'single-tab',
+]);
+
+// The orchestrator and the Android launcher both fall back to their default mode
+// on an unrecognized value, so a typo has to fail here to stay visible.
+function assertBrowsingMode(value) {
+  if (value === undefined || value === null || value === '') return;
+  if (BROWSING_MODES.has(String(value).trim().toLowerCase())) return;
+  throw new Error(
+    `playwright-mobile-lib: unknown capabilities.browsingMode '${value}'. Expected one of `
+    + 'public, private, single-tab-public, single-tab-private.',
+  );
+}
+
 function effectiveCapabilities(capabilities) {
-  return capabilities || {};
+  const caps = capabilities || {};
+  assertBrowsingMode(caps.browsingMode);
+  return caps;
 }
 
 // Gate capabilities ride the connect header, where the orchestrator also accepts
