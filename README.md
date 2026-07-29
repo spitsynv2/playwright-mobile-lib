@@ -36,8 +36,11 @@ and configure it only when Zebrunner reporting is needed.
 
 Node.js 22 or newer is required; Node 24 (the current LTS) is recommended. The
 `playwright` and `@playwright/test` versions used by tests must match the
-Playwright version the device containers run, so agree on that version with
-whoever operates the orchestrator before upgrading.
+Playwright version the device containers run. The mobile orchestrator reads the
+client version from Playwright's connect `User-Agent` and starts or restarts
+the bridge container with that version; its `ORCH_PLAYWRIGHT_VERSION` is only a
+fallback. A directly managed bridge still needs the matching
+`PLAYWRIGHT_VERSION` set by its operator.
 
 ## Quickstart
 
@@ -425,6 +428,42 @@ project before trusting a device run:
    fixtures against a local browser.
 3. One real-device run per platform, using a spec that touches navigation,
    locator input, `page.bridge`, and screenshots.
+
+## Developing locally
+
+Node.js 22+ is required. From this repository:
+
+```bash
+npm install
+npm test
+```
+
+`npm test` builds the minified CommonJS bundle, type-checks the public
+declarations and rejected-usage cases, verifies the fixture wiring, and runs
+the unit tests. It does not book or launch a physical device.
+
+To exercise the exact package shape in a consuming repository:
+
+```bash
+npm pack --pack-destination /tmp
+
+cd ../playwright-mobile-bridge-tests/tests-ios
+npm install --no-save /tmp/playwright-mobile-lib-1.0.0.tgz
+npx playwright install webkit
+npm run typecheck
+PWM_ORCHESTRATOR= IOS_WS_ENDPOINT= REPORTING_ENABLED=false \
+  npx playwright test test/specs/locator-queries.spec.js --reporter=list
+```
+
+Repeat with `tests-android`, local Chromium, and empty
+`ANDROID_WS_ENDPOINT`/ADB selectors for the Android pre-flight. Run
+`npm install` in the consumer afterwards to restore the version pinned in its
+`package.json`.
+
+The local browser path verifies fixture composition and the ordinary
+Playwright surface. `page.bridge`, Appium input, native dialogs, physical
+viewport behavior, and farm recording require a real device through a direct
+bridge or the orchestrator.
 
 ## License
 
