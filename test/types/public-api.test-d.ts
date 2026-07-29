@@ -11,6 +11,7 @@ import {
   type DeviceInfo,
   type Page,
 } from '../../index';
+import { defineConfig as definePlaywrightConfig } from '@playwright/test';
 
 test('worker fixtures are visible to tests', async ({ page, deviceInfo, devicePreset }) => {
   const info: DeviceInfo = deviceInfo;
@@ -104,6 +105,10 @@ export default defineConfig({
     { name: 'env-gates', use: { capabilities: envDrivenGates } },
     { name: 'env-mode', use: { capabilities: envDrivenMode } },
   ],
+});
+
+definePlaywrightConfig({
+  projects: [{ name: 'augmented', use: { capabilities: iosCapabilities } }],
 });
 
 test('bridge, appium, and browsing-mode extras are typed', async ({ page }) => {

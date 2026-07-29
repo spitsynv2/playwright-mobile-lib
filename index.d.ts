@@ -266,6 +266,11 @@ type BridgeApi = IOSBridgeKnownOps & AndroidBridgeKnownOps & {
 };
 
 declare module '@playwright/test' {
+  interface PlaywrightWorkerOptions {
+    /** Desired capabilities; selects the platform driver and pool-matches a device. */
+    capabilities: Capabilities;
+  }
+
   interface Page {
     /** iOS only: proxy that runs the forwarded Page call in Appium (native) input mode. */
     readonly appium: Page;
