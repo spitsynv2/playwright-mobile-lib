@@ -5,8 +5,11 @@ import {
   expect,
   defineConfig,
   devices,
+  mergeTests,
   resolveIOSDevicePreset,
   withAppiumInputMode,
+  type Browser,
+  type BrowserContext,
   type Capabilities,
   type DeviceInfo,
   type Page,
@@ -19,6 +22,13 @@ test('worker fixtures are visible to tests', async ({ page, deviceInfo, devicePr
   expect(`${info.deviceName} ${info.platformName} ${info.osVersion} ${browserVersion}`).toBeTruthy();
   expect(devicePreset.viewport.width).toBeGreaterThan(0);
   await page.goto('https://example.com');
+});
+
+test('browser is the platform connection', async ({ browser }) => {
+  const connection: Browser = browser;
+  expect(connection.browserType().name()).toBeTruthy();
+  const second: BrowserContext = await connection.newContext();
+  await second.close();
 });
 
 const androidCapabilities: Capabilities = {
@@ -160,3 +170,60 @@ test('supported Playwright APIs are unaffected by the augmentation', async ({ pa
 
 const preset = resolveIOSDevicePreset('iphone xr', devices);
 expect(preset === null || typeof preset.userAgent === 'string').toBeTruthy();
+
+// Fixture authoring: a page object, a wrapped `page`, and a worker fixture that
+// reads `capabilities` must all keep the mobile fixtures and their types.
+class HomePage {
+  constructor(readonly page: Page) {}
+
+  async open() {
+    await this.page.goto('https://example.com');
+    await this.page.getByRole('button').appium.tap();
+  }
+}
+
+type AppOptions = { appBaseUrl: string };
+type AppFixtures = { homePage: HomePage };
+type AppWorkerFixtures = { platform: string };
+
+const appTest = test.extend<AppOptions & AppFixtures, AppWorkerFixtures>({
+  appBaseUrl: ['https://example.com', { option: true }],
+
+  homePage: async ({ page }, use) => {
+    await use(new HomePage(page));
+  },
+
+  page: async ({ page, appBaseUrl }, use) => {
+    await page.goto(appBaseUrl);
+    await use(page);
+  },
+
+  platform: [async ({ capabilities }, use) => {
+    await use(capabilities.platformName);
+  }, { scope: 'worker' }],
+});
+
+appTest('extended fixtures keep the mobile surface', async ({ homePage, platform, deviceInfo }) => {
+  await homePage.open();
+  const sessionId: string = await homePage.page.bridge.getSessionId();
+  expect(`${platform} ${deviceInfo.deviceName} ${sessionId}`).toBeTruthy();
+});
+
+const mergedTest = mergeTests(test, appTest);
+
+mergedTest('merged tests keep both fixture sets', async ({ page, homePage, devicePreset }) => {
+  await homePage.open();
+  expect(devicePreset.viewport.width).toBeGreaterThan(0);
+  await page.bridge.getDeviceInfo();
+});
+
+// A consumer option fixture under `use` needs the generic overload.
+export const extendedConfig = defineConfig<AppOptions>({
+  use: { appBaseUrl: 'https://example.com', capabilities: iosCapabilities },
+});
+
+// The merge form takes more than one config.
+export const mergedConfig = defineConfig(
+  { use: { capabilities: iosCapabilities } },
+  { projects: [{ name: 'override', use: { reopenInMode: 'public' } }] },
+);

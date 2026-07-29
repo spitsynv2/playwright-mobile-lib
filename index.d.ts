@@ -1,4 +1,5 @@
 import {
+  Browser,
   Page,
   Locator,
   BrowserContextOptions,
@@ -201,6 +202,20 @@ export type IOSWorkerOptions = MobileWorkerOptions;
 export type IOSTestOptions = MobileTestOptions;
 
 /**
+ * Worker-scoped Playwright fixtures, with `browser` re-pointed at the platform
+ * connection instead of a locally launched browser.
+ */
+type MobilePlaywrightWorkerArgs = Omit<PlaywrightWorkerArgs, 'browser'> & {
+  /**
+   * The worker's browser connection. iOS gives the bridge WebKit `Browser`; a
+   * local pre-flight run gives the launched `Browser`. Reading it throws on an
+   * Android device run, where the connection is an `AndroidDevice` — use
+   * `context` / `page` there.
+   */
+  browser: Browser;
+};
+
+/**
  * Cross-platform Playwright `test`. The platform is chosen from
  * `capabilities.platformName` (`'iOS'` -> Safari bridge, `'Android'` -> Chrome).
  * `page.bridge` exists on both platforms with a per-platform op set; the
@@ -209,13 +224,31 @@ export type IOSTestOptions = MobileTestOptions;
  */
 export const test: TestType<
   PlaywrightTestArgs & PlaywrightTestOptions & MobileTestOptions,
-  PlaywrightWorkerArgs & PlaywrightWorkerOptions & MobileWorkerOptions & MobileWorkerFixtures
+  MobilePlaywrightWorkerArgs & PlaywrightWorkerOptions & MobileWorkerOptions & MobileWorkerFixtures
 >;
 
-/** `defineConfig` typed with this library's worker/test options (e.g. `capabilities`). */
+/**
+ * `defineConfig` typed with this library's worker/test options (e.g.
+ * `capabilities`). Mirrors Playwright's overloads, so consumer option fixtures
+ * and the `defineConfig(base, override)` merge form both type-check.
+ */
 export function defineConfig(
   config: PlaywrightTestConfig<MobileTestOptions, MobileWorkerOptions>,
 ): PlaywrightTestConfig<MobileTestOptions, MobileWorkerOptions>;
+export function defineConfig<T>(config: PlaywrightTestConfig<T>): PlaywrightTestConfig<T>;
+export function defineConfig<T, W>(config: PlaywrightTestConfig<T, W>): PlaywrightTestConfig<T, W>;
+export function defineConfig(
+  config: PlaywrightTestConfig<MobileTestOptions, MobileWorkerOptions>,
+  ...configs: PlaywrightTestConfig<MobileTestOptions, MobileWorkerOptions>[]
+): PlaywrightTestConfig<MobileTestOptions, MobileWorkerOptions>;
+export function defineConfig<T>(
+  config: PlaywrightTestConfig<T>,
+  ...configs: PlaywrightTestConfig<T>[]
+): PlaywrightTestConfig<T>;
+export function defineConfig<T, W>(
+  config: PlaywrightTestConfig<T, W>,
+  ...configs: PlaywrightTestConfig<T, W>[]
+): PlaywrightTestConfig<T, W>;
 
 /** Bridge operations available on both platforms through `page.bridge.<op>(args?)`. */
 interface BridgeCommonOps {
@@ -269,6 +302,13 @@ declare module '@playwright/test' {
   interface PlaywrightWorkerOptions {
     /** Desired capabilities; selects the platform driver and pool-matches a device. */
     capabilities: Capabilities;
+  }
+
+  interface PlaywrightTestOptions {
+    /** iOS only: reopen `page` in a fresh tab of this mode before the test body. */
+    reopenInMode: 'private' | 'public' | undefined;
+    /** Extra options merged into the fixture context (iOS `newContext` / Android `launchBrowser`). */
+    extraContextOptions: BrowserContextOptions;
   }
 
   interface Page {

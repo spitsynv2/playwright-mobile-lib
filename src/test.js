@@ -5,6 +5,7 @@ const { test: base, expect } = require('@playwright/test');
 
 const { selectDriver } = require('./platforms');
 const { defaultCapabilities, connectTimeoutMs } = require('./core/capabilities');
+const { warnUnsupportedUseOptions } = require('./core/use-guard');
 
 const test = base.extend({
   // Per-test override ('private' | 'public') that reopens `page` in a fresh tab
@@ -37,6 +38,11 @@ const test = base.extend({
     }
   }, { scope: 'worker', timeout: connectTimeoutMs + 30_000 }],
 
+  // Overrides Playwright's built-in browser, which would otherwise launch a local chromium.
+  browser: [async ({ _driver, _connection }, use) => {
+    await use(_driver.resolveBrowser(_connection));
+  }, { scope: 'worker' }],
+
   deviceInfo: [async ({ capabilities, _driver }, use) => {
     await use(_driver.resolveDeviceInfo(capabilities));
   }, { scope: 'worker' }],
@@ -45,11 +51,14 @@ const test = base.extend({
     await use(_driver.resolvePreset(deviceInfo));
   }, { scope: 'worker' }],
 
-  context: async ({ _driver, _connection, devicePreset, extraContextOptions, capabilities }, use) => {
+  context: async ({ _driver, _connection, devicePreset, extraContextOptions, capabilities }, use, testInfo) => {
+    const useOptions = (testInfo.project && testInfo.project.use) || {};
+    warnUnsupportedUseOptions(useOptions, _driver.unsupportedUseOptions);
     const context = await _driver.createContext(_connection, {
       preset: devicePreset,
       extraContextOptions,
       capabilities,
+      useOptions,
     });
     try {
       await use(context);

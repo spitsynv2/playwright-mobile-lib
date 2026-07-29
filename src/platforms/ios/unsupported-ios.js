@@ -38,6 +38,36 @@ const UNSUPPORTED_MOUSE_METHODS = {
   wheel: 'iOS has no wheel/trackpad input modality — scroll via touch (scrollIntoViewIfNeeded / evaluate(scrollBy))',
 };
 
+// Context options that reach newContext() but the bridge or the device cannot
+// honor. Playwright's instrumentation injects `use` into every newContext call,
+// so these arrive silently unless the fixture reports them.
+const UNSUPPORTED_USE_OPTIONS = {
+  storageState: 'the shared device cookie jar cannot be read or restored — sign in through the UI or inject a token in the test',
+  httpCredentials: 'Emulation.setAuthCredentials is a bridge stub — send extraHTTPHeaders: { Authorization } for preemptive Basic auth',
+  proxy: 'the device reaches the network on its own path',
+  ignoreHTTPSErrors: 'Safari owns certificate trust on the device',
+  javaScriptEnabled: 'Safari owns this in iOS Settings',
+  bypassCSP: 'the bridge cannot disable CSP on the device',
+  acceptDownloads: 'an iOS download is a native flow, not a Playwright download',
+  viewport: 'the device owns its viewport — select a device with capabilities.deviceName',
+  screen: 'the device owns its screen — select a device with capabilities.deviceName',
+  deviceScaleFactor: 'the device owns its scale factor — select a device with capabilities.deviceName',
+  isMobile: 'the device is already mobile — select a device with capabilities.deviceName',
+  hasTouch: 'the device is already touch-driven — select a device with capabilities.deviceName',
+  userAgent: 'Safari owns its user agent — select a device with capabilities.deviceName',
+  locale: 'set the language in iOS Settings',
+  timezoneId: 'set the time zone in iOS Settings',
+  geolocation: 'real GPS — an override needs physical movement or an Xcode dev profile',
+  permissions: 'permissions are owned by iOS Settings and system prompts',
+  offline: 'only airplane mode takes the device offline, which drops the inspector WebSocket',
+  colorScheme: 'set appearance in iOS Settings',
+  reducedMotion: 'set motion preferences in iOS Settings',
+  forcedColors: 'set accessibility colors in iOS Settings',
+  contrast: 'set contrast in iOS Settings',
+  video: 'the farm records the session video and attaches it to the report',
+  recordVideo: 'the farm records the session video and attaches it to the report',
+};
+
 // addInitScript works, but iOS Safari drops the before-load bootstrap across a
 // cross-origin process swap (even on a paused provisional target), so the
 // bridge replays the script into the committed document: before-load on
@@ -52,5 +82,6 @@ module.exports = {
   UNSUPPORTED_PAGE_METHODS,
   UNSUPPORTED_LOCATOR_METHODS,
   UNSUPPORTED_MOUSE_METHODS,
+  UNSUPPORTED_USE_OPTIONS,
   ADDINITSCRIPT_CROSS_ORIGIN_CAVEAT,
 };

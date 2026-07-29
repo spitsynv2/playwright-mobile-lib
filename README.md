@@ -87,7 +87,10 @@ test('opens a page', async ({ page }) => {
 
 With no endpoint configured, both projects run locally: iOS launches WebKit and
 Android launches Chromium, each emulating the requested device preset. This is
-the default pre-flight path and needs no devices.
+the default pre-flight path and needs no devices. When `deviceName` is empty or
+is not a device Playwright knows, a local run still emulates a phone —
+`iPhone 16 Plus` on iOS and `Pixel 7` on Android — rather than a desktop
+viewport.
 
 To run against real devices, point the run at an orchestrator:
 
@@ -148,8 +151,19 @@ the browser package. Autocomplete lists the full set.
 | `capabilities` | worker option | Desired capabilities for the run. |
 | `reopenInMode` | test option | iOS only: reopen `page` in a fresh `private` or `public` tab before the test body. Ignored on Android. |
 | `extraContextOptions` | test option | Extra `BrowserContextOptions` merged into context creation. |
+| `browser` | worker, read-only | The worker's browser connection, replacing Playwright's built-in fixture so no local browser is launched alongside the device. |
 | `deviceInfo` | worker, read-only | The device the worker resolved: `deviceName`, `platformName`, `osVersion`, and `browserVersion` on Android. |
 | `devicePreset` | worker, read-only | The Playwright device preset resolved from `deviceInfo`. |
+
+On iOS, `browser` is the bridge WebKit `Browser`, so `browser.browserType().name()`
+reports `webkit` and `browser.newContext()` behaves as it does in Playwright. On a
+local pre-flight run it is the launched `Browser` on either platform. An Android
+device run has no `Browser`: the connection is an `AndroidDevice`, so requesting
+the fixture throws with an explanation. Use `context` and `page` there,
+`context.newPage()` for a second tab, or the `request` fixture for API calls.
+
+Pages opened with `context.newPage()` get the same platform extensions and guards
+as the `page` fixture, so `page.bridge` works on a second tab too.
 
 ```js
 test('reports the device it ran on', async ({ page, deviceInfo }) => {
@@ -171,6 +185,7 @@ These additions are platform-specific:
 | `withAppiumInputMode(page, fn)` | iOS only |
 | `reopenInMode` | iOS only; ignored on Android |
 | `resolveIOSDevicePreset()` | iOS only |
+| `browser` fixture | iOS and local pre-flight runs; throws on an Android device run |
 
 For ordinary iOS interaction, prefer awaited locator `tap()` calls. Use
 `locator.appium.tap()` only when trusted physical input is required:
@@ -211,6 +226,69 @@ through with the reason on hover, before the test is ever run.
 before load on same-origin navigations, but is replayed into the committed
 document (after load) on the first cross-origin page.
 
+## Context options under `use`
+
+Context options set under `use` in the config, at the top level or per project,
+are honored where the device can honor them and reported where it cannot. What a
+device accepts differs sharply by platform, so the two are listed separately.
+
+**Android honors the ordinary Playwright set.** The launched Chrome context
+accepts `baseURL`, `viewport`, `locale`, `timezoneId`, `geolocation`,
+`permissions`, `offline`, `extraHTTPHeaders`, `httpCredentials`,
+`ignoreHTTPSErrors`, `bypassCSP`, `javaScriptEnabled`, `serviceWorkers`,
+`acceptDownloads`, `proxy`, `recordHar`, the appearance options, and the rest of
+that set, so a config written for default Playwright keeps working on a device.
+Only three cannot be applied:
+
+| Ignored on Android | Instead |
+| --- | --- |
+| `storageState` | `launchBrowser()` does not take it. Restore the cookies yourself with `context.addCookies()`, which Android allows. |
+| `clientCertificates` | `launchBrowser()` does not take them. |
+| `video` | The farm records the session video; use `extraContextOptions.recordVideo` for a per-context recording. |
+
+**iOS Safari honors far fewer**, because the bridge cannot fake a physical
+device's profile or system settings:
+
+| Ignored on iOS | Instead |
+| --- | --- |
+| `viewport`, `screen`, `deviceScaleFactor`, `isMobile`, `hasTouch`, `userAgent` | Select a device with `capabilities.deviceName`. |
+| `locale`, `timezoneId`, `colorScheme`, `reducedMotion`, `forcedColors`, `contrast` | Change the setting in iOS Settings. |
+| `permissions` | Grant permissions in iOS Settings or through the system prompt. |
+| `geolocation`, `offline` | Not available: real GPS, and only airplane mode takes the device offline. |
+| `storageState` | Sign in through the UI or inject a token; the cookie jar is shared. |
+| `httpCredentials` | Send `extraHTTPHeaders: { Authorization: 'Basic <base64>' }` for preemptive Basic auth. |
+| `proxy`, `ignoreHTTPSErrors`, `javaScriptEnabled`, `bypassCSP`, `acceptDownloads` | Not available: Safari and iOS own these. |
+| `video` | The farm records the session video. |
+
+On both platforms the launch-level options cannot apply, because the farm owns
+browser selection and startup: `browserName`, `defaultBrowserType`, `headless`,
+`channel`, `launchOptions`, and `connectOptions`. Use `capabilities.platformName`
+to pick the platform, `capabilities.args` for Android browser flags, and
+`PWM_ORCHESTRATOR` for the connection.
+
+Unaffected everywhere: `baseURL`, `trace`, `screenshot`, `testIdAttribute`,
+`actionTimeout`, and `navigationTimeout`. The raw `use: { contextOptions }`
+escape hatch is read the same way as the top-level options, with top-level
+values winning.
+
+Both the forwarding and the warnings read the config, so a per-file
+`test.use({ viewport })` is not covered by either. Use
+`test.use({ extraContextOptions: { ... } })` for per-file context options; it is
+applied directly by the driver on both platforms and wins over everything else.
+
+Where an option is ignored, the library warns once naming the option and the
+alternative, rather than failing the run. Those warnings also appear on a local
+pre-flight run, where a launched browser does honor the options. That is
+deliberate: pre-flight exists to predict the device run, so a configuration that
+cannot work on a device says so before a device is booked.
+
+`capabilities` and `extraContextOptions` are the explicit route and are always
+applied, overriding anything forwarded from `use`. Precedence on Android is
+`use`, then `capabilities`, then `extraContextOptions`. One asymmetry is worth
+knowing: `capabilities.viewport` is applied on an Android device even though
+`page.setViewportSize()` throws, because a capability is read as a deliberate
+request while a mid-test resize is not.
+
 ## Environment variables
 
 The library reads `process.env` and does not load `.env` files itself. Load them
@@ -244,6 +322,11 @@ The exported `test` is a standard Playwright `TestType`. Consumers can call
 Option fixtures can be overridden with
 `test.use({ capabilities, extraContextOptions, reopenInMode })` or under `use` in
 this package's `defineConfig()`.
+
+`defineConfig()` mirrors Playwright's own signatures, so a consumer option
+fixture passes its type through as `defineConfig<AppOptions>({ use: { ... } })`,
+and the merge form `defineConfig(baseConfig, override)` works. The three mobile
+options are also recognized by `defineConfig` imported from `@playwright/test`.
 
 This TypeScript example adds a page-object fixture while preserving all mobile
 fixtures and types:

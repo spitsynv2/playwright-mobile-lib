@@ -18,12 +18,18 @@ const {
   connectTimeoutMs,
 } = require('../../core/capabilities');
 const { blockUnsupportedContextAPIs } = require('../../core/unsupported');
-const { UNSUPPORTED_CONTEXT_METHODS } = require('./unsupported-ios');
+const { patchContextNewPage } = require('../../core/context-patch');
+const { UNSUPPORTED_CONTEXT_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-ios');
 const { ensureAppiumPrototypesPatched } = require('./bridge-proxy');
 const { recordAction } = require('../../core/telemetry');
 
+// Fallback preset for local emulation when the caps device is unknown to Playwright.
+const DEFAULT_LOCAL_IOS_DEVICE = 'iPhone 16 Plus';
+
 const driver = {
   name: 'iOS',
+
+  unsupportedUseOptions: UNSUPPORTED_USE_OPTIONS,
 
   // Connects to the bridge, or launches WebKit locally when no farm endpoint is set.
   async connect(capabilities) {
@@ -70,12 +76,21 @@ const driver = {
   // On a real device the viewport is cosmetic (setViewportSize is blocked); the
   // userAgent feeds reporting capabilities.
   resolvePreset(deviceInfo) {
-    return resolveIOSDevicePreset(deviceInfo.deviceName, devices) || {};
+    const preset = resolveIOSDevicePreset(deviceInfo.deviceName, devices);
+    if (preset) return preset;
+    if (resolveWsEndpoint('iOS')) return {};
+    return resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices) || {};
+  },
+
+  // The connection is always a Browser here (bridge connect or webkit.launch).
+  resolveBrowser(connection) {
+    return connection;
   },
 
   async createContext(browser, { preset, extraContextOptions }) {
     const context = await browser.newContext({ ...preset, ...extraContextOptions });
     blockUnsupportedContextAPIs(context, UNSUPPORTED_CONTEXT_METHODS);
+    patchContextNewPage(context, ensureAppiumPrototypesPatched);
     return context;
   },
 

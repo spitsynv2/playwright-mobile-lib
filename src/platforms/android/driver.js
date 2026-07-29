@@ -14,7 +14,8 @@ const {
   slowMoMs,
 } = require('../../core/capabilities');
 const { defineThrowing } = require('../../core/unsupported');
-const { UNSUPPORTED_PAGE_METHODS } = require('./unsupported-android');
+const { patchContextNewPage } = require('../../core/context-patch');
+const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
 const { makeBridgeProxy } = require('./bridge-proxy');
 const {
   attachTestSession,
@@ -103,6 +104,23 @@ const LAUNCH_BROWSER_KEYS = [
   'screen', 'serviceWorkers', 'strictSelectors',
   'timezoneId', 'userAgent', 'viewport',
 ];
+
+// `args` and `pkg` are launch-only capabilities, never Playwright `use` options.
+const FORWARDED_USE_KEYS = LAUNCH_BROWSER_KEYS.filter((key) => key !== 'args' && key !== 'pkg');
+
+// launchBrowser() skips Playwright's runBeforeCreateBrowserContext hook, so the
+// project's `use` options only reach a device context if the driver forwards them.
+function forwardedUseOptions(useOptions) {
+  const use = useOptions || {};
+  const opts = {};
+  for (const source of [use.contextOptions, use]) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of FORWARDED_USE_KEYS) {
+      if (source[key] !== undefined) opts[key] = source[key];
+    }
+  }
+  return opts;
+}
 
 function buildLaunchBrowserOptions(caps) {
   const opts = {};
@@ -219,6 +237,8 @@ async function readBrowserVersion(connection, pkg) {
 const driver = {
   name: 'Android',
 
+  unsupportedUseOptions: UNSUPPORTED_USE_OPTIONS,
+
   async connect(capabilities) {
     const caps = effectiveCapabilities(capabilities);
     const wsEndpoint = resolveWsEndpoint('Android');
@@ -255,24 +275,41 @@ const driver = {
     return resolveAndroidDevicePreset(deviceInfo.deviceName);
   },
 
-  async createContext(connection, { preset, extraContextOptions, capabilities }) {
+  // A device run connects as an AndroidDevice; only a local pre-flight run has a Browser.
+  resolveBrowser(connection) {
+    if (typeof connection.newContext === 'function') return connection;
+    throw new Error(
+      'The `browser` fixture is not available on an Android device run — the connection is an '
+      + 'AndroidDevice (farm run, or an ADB run pinned by capabilities.serial / ANDROID_SERIAL), '
+      + 'not a Browser. Use `context` / `page`, `context.newPage()` for a second tab, or the '
+      + '`request` fixture for API calls.',
+    );
+  },
+
+  async createContext(connection, { preset, extraContextOptions, capabilities, useOptions }) {
     const caps = effectiveCapabilities(capabilities);
     const mode = normalizeBrowsingMode(caps.browsingMode);
     // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
       await connection.shell(`am force-stop ${pkg}`);
-      const context = await connection.launchBrowser({ ...buildLaunchBrowserOptions(caps), ...extraContextOptions });
+      const context = await connection.launchBrowser({
+        ...forwardedUseOptions(useOptions),
+        ...buildLaunchBrowserOptions(caps),
+        ...extraContextOptions,
+      });
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
       contextBrowsingMode.set(context, mode);
       contextsWithoutArtifactRail.add(context);
       if (isPrivateMode(mode) && !(await openIncognitoPage(connection, context, pkg))) {
         console.warn(`android: incognito tab did not surface for mode '${mode}'; continuing in normal profile`);
       }
+      patchContextNewPage(context, ensureAndroidPrototypesPatched);
       return context;
     }
     const context = await connection.newContext({ ...preset, ...extraContextOptions });
     contextBrowsingMode.set(context, mode);
+    patchContextNewPage(context, ensureAndroidPrototypesPatched);
     return context;
   },
 
