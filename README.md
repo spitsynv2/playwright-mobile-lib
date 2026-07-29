@@ -345,8 +345,8 @@ project before trusting a device run:
 
 ## License
 
-Proprietary and confidential. See [LICENSE](./LICENSE). This package is not open
-source and must not be published to a public registry.
+Playwright Mobile Library is released under version 2.0 of the
+[Apache License](https://www.apache.org/licenses/LICENSE-2.0).
 
 The distributed bundle contains only this project's own code; Playwright and the
 optional Zebrunner reporter stay external dependencies and are not redistributed.

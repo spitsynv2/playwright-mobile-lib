@@ -38,7 +38,7 @@
       "optional": true
     }
   },
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@playwright/test": "^1.62.0",
     "@types/node": "^22.20.1",
