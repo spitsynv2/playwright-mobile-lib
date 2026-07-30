@@ -145,7 +145,9 @@ On Android, `capabilities` also accepts the context options the launched Chrome
 honors (`viewport`, `locale`, `timezoneId`, `geolocation`, `permissions`,
 `extraHTTPHeaders`, `httpCredentials`, `proxy`, `recordHar`, `recordVideo`, and
 the rest of that set), plus `args` for extra browser flags and `pkg` to select
-the browser package. Autocomplete lists the full set.
+the browser package. Autocomplete lists the full set. A physical Android context
+defaults `hasTouch` to `true`, so `locator.tap()` and `touchscreen` work without
+an extra capability; an explicit `hasTouch: false` is still honored.
 
 ## Fixtures and options
 
@@ -167,6 +169,11 @@ the fixture throws with an explanation. Use `context` and `page` there,
 
 Pages opened with `context.newPage()` get the same platform extensions and guards
 as the `page` fixture, so `page.bridge` works on a second tab too.
+
+Before a real Android device context is exposed to tests, the library replays
+custom selector engines registered through Playwright's `selectors` API and the
+configured `testIdAttribute` onto that context. Selectors registered before the
+device connection therefore behave the same way as they do in local Chromium.
 
 ```js
 test('reports the device it ran on', async ({ page, deviceInfo }) => {
@@ -241,6 +248,9 @@ accepts `baseURL`, `viewport`, `locale`, `timezoneId`, `geolocation`,
 `ignoreHTTPSErrors`, `bypassCSP`, `javaScriptEnabled`, `serviceWorkers`,
 `acceptDownloads`, `proxy`, `recordHar`, the appearance options, and the rest of
 that set, so a config written for default Playwright keeps working on a device.
+The driver defaults `hasTouch` to `true` for a physical device and preserves an
+explicit override.
+
 Only three cannot be applied:
 
 | Ignored on Android | Instead |
