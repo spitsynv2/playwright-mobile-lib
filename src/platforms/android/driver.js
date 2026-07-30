@@ -3,7 +3,7 @@
 // device; otherwise it launches a local Chromium with the caps device preset
 // (viewport emulation) for local pre-flight validation.
 const { _android: android } = require('playwright');
-const { chromium, devices } = require('@playwright/test');
+const { chromium, devices, selectors } = require('@playwright/test');
 
 const {
   resolveWsEndpoint,
@@ -120,6 +120,22 @@ function forwardedUseOptions(useOptions) {
     }
   }
   return opts;
+}
+
+const NO_TIMEOUT = { signal: undefined, timeout: 0 };
+
+// launchBrowser() skips the selector plumbing newContext() gets, so anything
+// registered before the device context existed has to be replayed onto it.
+async function applyRegisteredSelectors(context) {
+  const channel = context._channel;
+  if (!channel || typeof channel.registerSelectorEngine !== 'function') return;
+  for (const selectorEngine of selectors._selectorEngines || []) {
+    await channel.registerSelectorEngine({ selectorEngine }, NO_TIMEOUT);
+  }
+  const testIdAttributeName = selectors._testIdAttributeName;
+  if (!testIdAttributeName || typeof channel.setTestIdAttributeName !== 'function') return;
+  context._options.testIdAttributeName = testIdAttributeName;
+  await channel.setTestIdAttributeName({ testIdAttributeName }, NO_TIMEOUT);
 }
 
 function buildLaunchBrowserOptions(caps) {
@@ -293,11 +309,15 @@ const driver = {
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
       await connection.shell(`am force-stop ${pkg}`);
-      const context = await connection.launchBrowser({
+      const launchOptions = {
         ...forwardedUseOptions(useOptions),
         ...buildLaunchBrowserOptions(caps),
         ...extraContextOptions,
-      });
+      };
+      // Playwright gates locator.tap/touchscreen on hasTouch; a physical device always has touch.
+      launchOptions.hasTouch = gateFlag(launchOptions.hasTouch) ?? true;
+      const context = await connection.launchBrowser(launchOptions);
+      await applyRegisteredSelectors(context);
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
       contextBrowsingMode.set(context, mode);
       contextsWithoutArtifactRail.add(context);

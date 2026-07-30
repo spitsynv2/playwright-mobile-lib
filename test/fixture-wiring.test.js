@@ -140,6 +140,12 @@ test('Android tolerates a run with no project `use`', async () => {
   assert.ok(Array.isArray(options.args), 'the driver always sets its own launch args');
 });
 
+test('Android enables touch on a device context unless it is explicitly disabled', async () => {
+  assert.equal((await launchWith({})).hasTouch, true);
+  assert.equal((await launchWith({ useOptions: { hasTouch: false } })).hasTouch, false);
+  assert.equal((await launchWith({ capabilities: { hasTouch: 'false' } })).hasTouch, false);
+});
+
 test('a consumer-created page is patched like the fixture page', async () => {
   const created = [];
   const page = { name: 'page' };
