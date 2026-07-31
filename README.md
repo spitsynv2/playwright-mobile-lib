@@ -157,6 +157,7 @@ an extra capability; an explicit `hasTouch: false` is still honored.
 | `reopenInMode` | test option | iOS only: reopen `page` in a fresh `private` or `public` tab before the test body. Ignored on Android. |
 | `extraContextOptions` | test option | Extra `BrowserContextOptions` merged into context creation. |
 | `browser` | worker, read-only | The worker's browser connection, replacing Playwright's built-in fixture so no local browser is launched alongside the device. |
+| `device` | worker, read-only | Android device runs only: the `AndroidDevice` behind the run, for native UI outside the web contents. Throws on iOS and on a local pre-flight run. |
 | `deviceInfo` | worker, read-only | The device the worker resolved: `deviceName`, `platformName`, `osVersion`, and `browserVersion` on Android. |
 | `devicePreset` | worker, read-only | The Playwright device preset resolved from `deviceInfo`. |
 
@@ -196,6 +197,55 @@ These additions are platform-specific:
 | `reopenInMode` | iOS only; ignored on Android |
 | `resolveIOSDevicePreset()` | iOS only |
 | `browser` fixture | iOS and local pre-flight runs; throws on an Android device run |
+| `device` fixture | Android device runs only; throws on iOS and on local pre-flight runs |
+
+### Native UI on Android: the `device` fixture
+
+Everything inside the page is ordinary Playwright, including JavaScript dialogs
+(`page.on('dialog')`) and HTTP basic auth (`httpCredentials` or an `Authorization`
+header), neither of which surfaces native UI on Android Chrome. What Playwright
+cannot see is UI drawn *outside* the web contents: the Android permission sheet,
+the download bar, intent choosers, and the soft keyboard.
+
+The `device` fixture exposes the `AndroidDevice` the context was launched from,
+which is Playwright's own UIAutomator-over-adb surface. It works the same on a
+farm run and on an ADB run, because the calls are dispatched to whichever process
+owns adb. Selector-based methods (`tap`, `longTap`, `fill`, `press`, `wait`,
+`info`, `scroll`, `swipe`, `fling`, `pinchOpen`, `pinchClose`) take an
+`AndroidSelector`; `device.input.*` covers raw coordinates, and `device.shell()`
+runs an adb shell command.
+
+```js
+test('accepts the native location prompt', async ({ page, device }) => {
+  await device.wait({ res: /permission_allow/ }, { timeout: 5_000 });
+  await device.tap({ res: 'com.android.permissioncontroller:id/permission_allow_foreground_only_button' });
+  await expect(page.locator('#status')).toContainText('Located');
+});
+```
+
+Prefer avoiding the prompt over tapping it. OS-level state is best set before
+Chrome starts, from a worker-scoped setup or a global setup step, because Chrome
+caches permission state for the life of its process:
+
+```js
+await device.shell('pm grant com.android.chrome android.permission.ACCESS_FINE_LOCATION');
+await device.shell('settings put secure location_mode 3');
+```
+
+Two constraints are worth knowing. UIAutomator only sees the native view tree, so
+it is blind to page content — keep using locators for anything inside the page.
+And resource ids differ across Android versions and OEM skins, so prefer `text`
+or `desc` with a regular expression and treat `res` as the fallback. Always
+`device.wait(selector)` before tapping, since dialog animations otherwise make
+the tap racy.
+
+`device.close()` and `device.launchBrowser()` throw: the worker connection and the
+`context` fixture own them, and calling either from a test would break the rest of
+the worker.
+
+Device calls are reported as fixture-kind actions, so they appear in the Zebrunner
+step log when `REPORTING_LOGS_INCLUDE_FIXTURES=true`. Text passed to `device.fill()`
+and `device.input.type()` is redacted there, as it is for the iOS native equivalents.
 
 For ordinary iOS interaction, prefer awaited locator `tap()` calls. Use
 `locator.appium.tap()` only when trusted physical input is required:

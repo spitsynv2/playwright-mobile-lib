@@ -17,6 +17,7 @@ const { defineThrowing } = require('../../core/unsupported');
 const { patchContextNewPage } = require('../../core/context-patch');
 const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
 const { makeBridgeProxy } = require('./bridge-proxy');
+const { makeDeviceProxy } = require('./device-proxy');
 const {
   attachTestSession,
   attachSessionCapabilities,
@@ -300,6 +301,21 @@ const driver = {
       + 'not a Browser. Use `context` / `page`, `context.newPage()` for a second tab, or the '
       + '`request` fixture for API calls.',
     );
+  },
+
+  // The same AndroidDevice the context is launched from, exposed for UIAutomator
+  // and adb work that reaches native UI outside the web contents. Only a real
+  // device run has one; local pre-flight Chromium is not backed by a device.
+  resolveDevice(connection) {
+    if (typeof connection.launchBrowser !== 'function') {
+      throw new Error(
+        'The `device` fixture requires an Android device run — this worker is a local pre-flight '
+        + 'Chromium, which has no device behind it. Pin a connected device with '
+        + 'capabilities.serial / ANDROID_SERIAL, or point the run at the farm '
+        + '(PWM_ORCHESTRATOR / ANDROID_WS_ENDPOINT).',
+      );
+    }
+    return makeDeviceProxy(connection);
   },
 
   async createContext(connection, { preset, extraContextOptions, capabilities, useOptions }) {

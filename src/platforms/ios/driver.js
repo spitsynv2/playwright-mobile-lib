@@ -87,6 +87,15 @@ const driver = {
     return connection;
   },
 
+  // iOS reaches native UI through the bridge's Appium session, not a device handle.
+  resolveDevice() {
+    throw new Error(
+      'The `device` fixture is Android-only — it exposes the AndroidDevice (UIAutomator over adb). '
+      + 'On iOS use `page.bridge.acceptAlert` / `page.bridge.nativeInput` for native dialogs, or '
+      + '`page.appium.*` / `withAppiumInputMode(page, fn)` for native input.',
+    );
+  },
+
   async createContext(browser, { preset, extraContextOptions }) {
     const context = await browser.newContext({ ...preset, ...extraContextOptions });
     blockUnsupportedContextAPIs(context, UNSUPPORTED_CONTEXT_METHODS);

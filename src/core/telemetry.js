@@ -124,6 +124,10 @@ function sanitizeMethodParams(method, params) {
       return { ...entry, value: entry.value === undefined ? undefined : '[REDACTED]' };
     });
   }
+  if (/^device\.(?:fill|input\.type)$/i.test(method) && Array.isArray(safe.args)) {
+    const valueIndex = /^device\.fill$/i.test(method) ? 1 : 0;
+    safe.args = safe.args.map((entry, index) => (index === valueIndex ? '[REDACTED]' : entry));
+  }
   if (
     /\.appium\.(?:.*\.)?(?:fill|type|insertText|pressSequentially)$/i.test(method) &&
     Array.isArray(safe.args)

@@ -11,6 +11,7 @@ import {
   TestType,
 } from '@playwright/test';
 import type {
+  AndroidDevice,
   BrowserContext as CoreBrowserContext,
   Locator as CoreLocator,
   Mouse as CoreMouse,
@@ -182,6 +183,17 @@ export interface DeviceInfo {
 
 /** Read-only worker-scoped fixtures added by this library. */
 export interface MobileWorkerFixtures {
+  /**
+   * Android device runs only: the `AndroidDevice` the context was launched from.
+   * Gives UIAutomator selectors (`tap` / `fill` / `wait` / `info` / `press`) and
+   * `shell()`, which reach native UI outside the web contents — system permission
+   * sheets, the download bar, intent choosers.
+   *
+   * Reading it throws on iOS (use `page.bridge.acceptAlert` / `page.bridge.nativeInput`)
+   * and on a local pre-flight run, which has no device. `close` and `launchBrowser`
+   * are blocked because the `_connection` and `context` fixtures own them.
+   */
+  device: AndroidDevice;
   /** Resolved device metadata for this worker's session. */
   deviceInfo: DeviceInfo;
   /** Playwright device preset (viewport / userAgent metadata) resolved from {@link DeviceInfo}. */

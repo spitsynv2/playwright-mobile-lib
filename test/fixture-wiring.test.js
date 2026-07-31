@@ -44,6 +44,50 @@ test('Android rejects `browser` on a device run', () => {
   );
 });
 
+test('Android resolves `device` to the AndroidDevice on a device run', async () => {
+  const calls = [];
+  const androidDevice = {
+    launchBrowser() {},
+    serial: () => 'ABC123',
+    input: { tap(point) { calls.push(['input.tap', point]); } },
+    async tap(selector) { calls.push(['tap', selector]); return 'tapped'; },
+    async shell(command) { calls.push(['shell', command]); return Buffer.from(''); },
+  };
+  const device = selectDriver('Android').resolveDevice(androidDevice);
+
+  assert.equal(await device.tap({ text: 'Allow' }), 'tapped');
+  await device.shell('pm grant com.android.chrome android.permission.ACCESS_FINE_LOCATION');
+  await device.input.tap({ x: 1, y: 2 });
+  assert.deepEqual(calls, [
+    ['tap', { text: 'Allow' }],
+    ['shell', 'pm grant com.android.chrome android.permission.ACCESS_FINE_LOCATION'],
+    ['input.tap', { x: 1, y: 2 }],
+  ]);
+  assert.equal(device.serial(), 'ABC123', 'sync members are not wrapped into a promise');
+});
+
+test('Android blocks fixture-owned lifecycle calls on `device`', () => {
+  const device = selectDriver('Android').resolveDevice({ launchBrowser() {}, close() {} });
+  for (const name of ['close', 'launchBrowser']) {
+    assert.throws(() => device[name](), /is not available from a test/);
+  }
+  assert.doesNotThrow(() => String(device), 'inherited members are neither blocked nor recorded');
+});
+
+test('Android rejects `device` on a local pre-flight run', () => {
+  assert.throws(
+    () => selectDriver('Android').resolveDevice({ newContext() {} }),
+    /`device` fixture requires an Android device run/,
+  );
+});
+
+test('iOS rejects `device` outright', () => {
+  assert.throws(
+    () => selectDriver('iOS').resolveDevice({ newContext() {} }),
+    /`device` fixture is Android-only/,
+  );
+});
+
 test('iOS falls back to a phone preset on a local run', () => {
   const driver = selectDriver('iOS');
   const expected = devices['iPhone 15 Plus'];

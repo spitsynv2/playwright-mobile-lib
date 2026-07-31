@@ -75,6 +75,14 @@ test('redacts method-specific input values and authentication URLs', () => {
     sanitizeMethodParams('page.appium.keyboard.insertText', { args: ['pass_123'] }),
     { args: ['[REDACTED]'] },
   );
+  assert.deepEqual(
+    sanitizeMethodParams('device.fill', { args: [{ res: 'password' }, 'pass_123', { timeout: 10 }] }),
+    { args: [{ res: 'password' }, '[REDACTED]', { timeout: 10 }] },
+  );
+  assert.deepEqual(
+    sanitizeMethodParams('device.input.type', { args: ['pass_123'] }),
+    { args: ['[REDACTED]'] },
+  );
   assert.equal(
     sanitizeMethodParams('page.goto', { url: 'https://httpbin.org/basic-auth/user/pass' }).url,
     'https://httpbin.org/basic-auth/[REDACTED]/[REDACTED]',

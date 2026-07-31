@@ -43,6 +43,13 @@ const test = base.extend({
     await use(_driver.resolveBrowser(_connection));
   }, { scope: 'worker' }],
 
+  // Android only: the AndroidDevice behind the run (UIAutomator selectors + adb
+  // shell) for native UI the web context cannot reach. Throws on iOS and on a
+  // local pre-flight run; a test that never requests it is unaffected.
+  device: [async ({ _driver, _connection }, use) => {
+    await use(_driver.resolveDevice(_connection));
+  }, { scope: 'worker' }],
+
   deviceInfo: [async ({ capabilities, _driver }, use) => {
     await use(_driver.resolveDeviceInfo(capabilities));
   }, { scope: 'worker' }],
