@@ -305,9 +305,17 @@ Only three cannot be applied:
 
 | Ignored on Android | Instead |
 | --- | --- |
-| `storageState` | `launchBrowser()` does not take it. Restore the cookies yourself with `context.addCookies()`, which Android allows. |
+| `storageState` | `launchBrowser()` does not take it. Restore the cookies yourself with `context.addCookies()`, which Android allows in `public` browsing mode. |
 | `clientCertificates` | `launchBrowser()` does not take them. |
 | `video` | The farm records the session video; use `extraContextOptions.recordVideo` for a per-context recording. |
+
+One caveat applies to the `private` browsing modes. Chrome for Android serves the
+incognito tab from a separate profile, but CDP applies `context.grantPermissions()`,
+`clearPermissions()`, `cookies()`, `addCookies()`, and `clearCookies()` to the
+regular profile, so those calls succeed without reaching the page under test.
+Per-page settings — `setGeolocation()`, `setExtraHTTPHeaders()`, `setOffline()`,
+and user-agent updates — apply to the tab directly and work in either mode. Run
+tests that depend on permissions or cookies with `browsingMode: 'public'`.
 
 **iOS Safari honors far fewer**, because the bridge cannot fake a physical
 device's profile or system settings:
