@@ -123,7 +123,8 @@ no environment-variable fallbacks for device capabilities.
 | `osVersion` | `string` | OS-version pool-match filter. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip between-test Safari cleanup. |
-| `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. |
+| `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
+| `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled; enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
 | `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | iOS only: per-component verbosity for the combined farm `session.log`. `off` removes that source from the bundle; other values are `fatal`, `error`, `warn`, `info`, `debug`, or `trace`. |
@@ -372,6 +373,7 @@ in the consuming project, for example with `dotenv`.
 | `ANDROID_WS_ENDPOINT` | Full Android WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for Android. |
 | `PWM_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. Defaults to `120000`; the connection fixture timeout is this value plus 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
 | `PWM_CLIENT_ID` | Stable `x-pwm-client-id` used for device pinning across reconnects. When absent, a unique ID is generated once per worker process. The legacy `IOS_CLIENT_ID` is still accepted. |
+| `PWM_TAB_CLOSE_TIMEOUT_MS` | Android: how long a single tab close may take during a sweep before the run moves on. Defaults to `5000`. |
 | `PWM_AUTH_HEADER` | Complete `Authorization` header value. Highest auth precedence. |
 | `PWM_AUTH_TOKEN` | Bearer token used when `PWM_AUTH_HEADER` is empty. |
 | `PWM_AUTH_USER` | Basic-auth username used when neither raw-header nor bearer auth is set. |

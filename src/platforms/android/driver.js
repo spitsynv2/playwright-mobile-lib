@@ -14,7 +14,7 @@ const {
   slowMoMs,
 } = require('../../core/capabilities');
 const { defineThrowing } = require('../../core/unsupported');
-const { patchContextNewPage } = require('../../core/context-patch');
+const { patchContextNewPage, patchContextClose } = require('../../core/context-patch');
 const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
 const { makeBridgeProxy } = require('./bridge-proxy');
 const { makeDeviceProxy } = require('./device-proxy');
@@ -67,6 +67,64 @@ function isPrivateMode(mode) {
   return mode === 'private' || mode === 'single-tab-private';
 }
 
+// launchBrowser() opens a tab per test (`am start -d about:blank`) and Android
+// context.close() only drops the CDP socket, so nothing but this closes a tab.
+const DEFAULT_TAB_CLOSE_TIMEOUT_MS = 5_000;
+const LATE_TAB_SETTLE_MS = 250;
+
+function tabCloseTimeoutMs() {
+  const raw = parseInt(process.env.PWM_TAB_CLOSE_TIMEOUT_MS || '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TAB_CLOSE_TIMEOUT_MS;
+}
+
+function livePages(context) {
+  if (typeof context.pages !== 'function') return [];
+  try {
+    return context.pages().filter((p) => !p.isClosed());
+  } catch {
+    return [];
+  }
+}
+
+// A wedged renderer can hang page.close() forever; teardown budget is shared.
+async function closeTab(page) {
+  let timer;
+  const closed = Promise.resolve().then(() => page.close()).catch(() => {});
+  try {
+    await Promise.race([
+      closed,
+      new Promise((resolve) => { timer = setTimeout(resolve, tabCloseTimeoutMs()); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// context.pages() omits targets that are still initializing, so a second pass picks
+// up tabs (mid-flight popups, tabs Chrome restored) that surfaced during the first.
+async function pruneTabs(context, keep) {
+  for (let pass = 0; pass < 2; pass++) {
+    const doomed = livePages(context).filter((p) => p !== keep);
+    if (!doomed.length) break;
+    await Promise.all(doomed.map(closeTab));
+    if (pass === 0) await new Promise((resolve) => setTimeout(resolve, LATE_TAB_SETTLE_MS));
+  }
+  return livePages(context).filter((p) => p !== keep).length;
+}
+
+async function sweepTabs(context, keep, phase) {
+  try {
+    const leftover = await pruneTabs(context, keep);
+    if (leftover) console.warn(`android: ${leftover} tab(s) survived the ${phase} sweep`);
+  } catch {}
+}
+
+// The tab launchBrowser() just opened; every other page is one Chrome restored.
+function launchPage(context) {
+  const pages = livePages(context);
+  return pages.find((p) => p.url() === 'about:blank') || pages[0] || null;
+}
+
 // Chrome activity that opens an incognito tab; the only CDP-visible incognito
 // path on Android (there is no launch/newPage incognito flag).
 const INCOGNITO_LAUNCHER = 'org.chromium.chrome.browser.incognito.IncognitoTabLauncher';
@@ -85,10 +143,12 @@ async function openIncognitoPage(connection, context, pkg) {
   }
   let incognito = await arrival;
   if (!incognito) incognito = context.pages().find((p) => !before.has(p)) || null;
-  if (!incognito) return null;
-  for (const p of context.pages()) {
-    if (p !== incognito) await p.close().catch(() => {});
+  // The intent already opened a tab even when it never surfaced; leave no orphan.
+  if (!incognito) {
+    await pruneTabs(context, [...before][0] || launchPage(context));
+    return null;
   }
+  await pruneTabs(context, incognito);
   return incognito;
 }
 
@@ -223,6 +283,13 @@ const contextBrowsingMode = new WeakMap();
 // contexts get no `use.screenshot` capture and newContext() ones must not be captured twice.
 const contextsWithoutArtifactRail = new WeakSet();
 
+// Teardown sweep per device context, shared by the fixture hook and the wrapped
+// context.close(); absent when the run opted out of tab pruning.
+const contextTabSweep = new WeakMap();
+
+// The page createPage handed to the test, kept as the survivor of a single-tab sweep.
+const contextPrimaryPage = new WeakMap();
+
 const SCREENSHOT_TIMEOUT_MS = 10_000;
 
 function resolveScreenshotOption(testInfo) {
@@ -324,7 +391,17 @@ const driver = {
     // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
+      const pruneTabsEnabled = gateFlag(caps.closeTabAfterTest) !== false;
       await connection.shell(`am force-stop ${pkg}`);
+      // Tabs Chrome restores without reloading have no CDP target, so a sweep can
+      // never see them; wiping browser data is the only way to reclaim those.
+      if (gateFlag(caps.resetBrowserData) === true) {
+        try {
+          await connection.shell(`pm clear ${pkg}`);
+        } catch (error) {
+          console.warn(`android: pm clear ${pkg} failed (${error.message}); keeping the existing profile`);
+        }
+      }
       const launchOptions = {
         ...forwardedUseOptions(useOptions),
         ...buildLaunchBrowserOptions(caps),
@@ -337,10 +414,20 @@ const driver = {
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
       contextBrowsingMode.set(context, mode);
       contextsWithoutArtifactRail.add(context);
+      if (pruneTabsEnabled) await sweepTabs(context, launchPage(context), 'launch');
       if (isPrivateMode(mode) && !(await openIncognitoPage(connection, context, pkg))) {
         console.warn(`android: incognito tab did not surface for mode '${mode}'; continuing in normal profile`);
       }
       patchContextNewPage(context, ensureAndroidPrototypesPatched);
+      if (pruneTabsEnabled) {
+        const sweep = () => sweepTabs(
+          context,
+          isSingleTab(mode) ? contextPrimaryPage.get(context) || null : null,
+          'teardown',
+        );
+        contextTabSweep.set(context, sweep);
+        patchContextClose(context, sweep);
+      }
       return context;
     }
     const context = await connection.newContext({ ...preset, ...extraContextOptions });
@@ -349,19 +436,10 @@ const driver = {
     return context;
   },
 
-  // Prune CDP-visible tabs before context.close() so a relaunched Chrome has
-  // nothing to restore; leftover on-device tabs are a GUI artifact close leaves.
-  // Mirrors iOS: runs only when closeTabAfterTest (default true) and not single-tab.
-  async onContextTeardown(context, { capabilities } = {}) {
-    const caps = effectiveCapabilities(capabilities);
-    if (gateFlag(caps.closeTabAfterTest) === false) return;
-    if (isSingleTab(contextBrowsingMode.get(context) || DEFAULT_ANDROID_BROWSING_MODE)) return;
-    try {
-      const pages = typeof context.pages === 'function' ? context.pages() : [];
-      for (const p of pages) {
-        await p.close().catch(() => {});
-      }
-    } catch {}
+  // Idempotent: a test that closed the context already ran this through the wrap.
+  async onContextTeardown(context) {
+    const sweep = contextTabSweep.get(context);
+    if (sweep) await sweep();
   },
 
   async createPage(context, { deviceInfo, testInfo } = {}) {
@@ -372,6 +450,7 @@ const driver = {
     const reuseFirst = existing.length > 0 && (isSingleTab(mode) || isPrivateMode(mode));
     const page = reuseFirst ? existing[0] : await context.newPage();
     ensureAndroidPrototypesPatched(page);
+    contextPrimaryPage.set(context, page);
 
     // Handshake: pull the bridge's per-test session id and device metadata at test
     // start and push them to Zebrunner. On a local/ADB run (no bridge) the sentinel

@@ -6,7 +6,7 @@ const test = require('node:test');
 const { devices } = require('@playwright/test');
 
 const { selectDriver } = require('../src/platforms');
-const { patchContextNewPage } = require('../src/core/context-patch');
+const { patchContextNewPage, patchContextClose } = require('../src/core/context-patch');
 
 const ENDPOINT_KEYS = ['IOS_WS_ENDPOINT', 'ANDROID_WS_ENDPOINT', 'PWM_ORCHESTRATOR'];
 
@@ -116,12 +116,14 @@ test('iOS resolves a known device the same way on both run modes', () => {
 
 // launchBrowser() is the only surface that sees these options; the returned
 // context stays minimal so createContext takes its non-incognito path.
-function fakeAndroidDevice() {
-  const calls = { launchOptions: null };
-  const context = { pages: () => [] };
+function fakeAndroidDevice(context = { pages: () => [] }) {
+  const calls = { launchOptions: null, shell: [] };
   return {
     calls,
-    async shell() { return Buffer.from('versionName=140.0.7000.1'); },
+    async shell(command) {
+      calls.shell.push(command);
+      return Buffer.from('versionName=140.0.7000.1');
+    },
     async launchBrowser(options) {
       calls.launchOptions = options;
       return context;
@@ -190,6 +192,147 @@ test('Android enables touch on a device context unless it is explicitly disabled
   assert.equal((await launchWith({ capabilities: { hasTouch: 'false' } })).hasTouch, false);
 });
 
+// Android tab hygiene. launchBrowser() adds a tab per test and Android
+// context.close() closes none, so every path below has to end at zero strays.
+class FakePage {
+  constructor(url = 'https://example.com/', onClose) {
+    this._url = url;
+    this._closed = false;
+    this._onClose = onClose;
+  }
+
+  url() { return this._url; }
+
+  isClosed() { return this._closed; }
+
+  async close() {
+    if (this._onClose) await this._onClose();
+    this._closed = true;
+  }
+}
+
+function fakeContext(pages = []) {
+  const all = [...pages];
+  const context = {
+    closeCalls: 0,
+    pagesAtClose: null,
+    pages: () => all.filter((page) => !page.isClosed()),
+    async newPage() {
+      const page = new FakePage('about:blank');
+      all.push(page);
+      return page;
+    },
+    async close() {
+      context.closeCalls += 1;
+      context.pagesAtClose = context.pages().length;
+    },
+  };
+  return context;
+}
+
+async function launchContext(context, capabilities) {
+  const driver = selectDriver('Android');
+  await driver.createContext(fakeAndroidDevice(context), {
+    preset: {},
+    extraContextOptions: {},
+    capabilities: { platformName: 'Android', browsingMode: 'public', ...capabilities },
+  });
+  return driver;
+}
+
+test('Android sweeps the tabs Chrome restored when it launches the browser', async () => {
+  const launched = new FakePage('about:blank');
+  const restored = [new FakePage('https://a.example/'), new FakePage('https://b.example/')];
+  const context = fakeContext([restored[0], launched, restored[1]]);
+
+  await launchContext(context);
+
+  assert.deepEqual(context.pages(), [launched], 'only the tab launchBrowser() opened survives');
+});
+
+test('Android teardown closes every tab the test left open', async () => {
+  const context = fakeContext([new FakePage('about:blank')]);
+  const driver = await launchContext(context);
+  const popup = await context.newPage();
+
+  await driver.onContextTeardown(context);
+
+  assert.equal(popup.isClosed(), true, 'a popup is not left behind');
+  assert.equal(context.pages().length, 0);
+});
+
+test('Android teardown keeps the fixture tab in single-tab mode', async () => {
+  const launched = new FakePage('about:blank');
+  const context = fakeContext([launched]);
+  const driver = await launchContext(context, { browsingMode: 'single-tab-public' });
+  const page = await driver.createPage(context, {});
+  const popup = await context.newPage();
+
+  await driver.onContextTeardown(context);
+
+  assert.equal(page, launched, 'single-tab reuses the launch tab');
+  assert.equal(popup.isClosed(), true, 'extra tabs still go');
+  assert.deepEqual(context.pages(), [launched], 'the one tab the mode promises stays');
+});
+
+test('a test that closes the context itself sweeps its tabs first', async () => {
+  const context = fakeContext([new FakePage('about:blank')]);
+  await launchContext(context);
+  await context.newPage();
+
+  await context.close();
+
+  assert.equal(context.closeCalls, 1, 'the real close still runs');
+  assert.equal(context.pagesAtClose, 0, 'no tab reaches the close that would strand it');
+});
+
+test('Android leaves tabs alone when closeTabAfterTest is off', async () => {
+  const launched = new FakePage('about:blank');
+  const restored = new FakePage('https://a.example/');
+  const context = fakeContext([restored, launched]);
+
+  const driver = await launchContext(context, { closeTabAfterTest: 'false' });
+  await driver.onContextTeardown(context);
+  await context.close();
+
+  assert.deepEqual(context.pages(), [restored, launched]);
+});
+
+test('Android clears browser data before launch only when asked', async () => {
+  const cleared = async (capabilities) => {
+    const device = fakeAndroidDevice(fakeContext([new FakePage('about:blank')]));
+    await selectDriver('Android').createContext(device, {
+      preset: {},
+      extraContextOptions: {},
+      capabilities: { platformName: 'Android', browsingMode: 'public', ...capabilities },
+    });
+    return device.calls.shell.some((command) => command.startsWith('pm clear'));
+  };
+
+  assert.equal(await cleared(), false, 'the profile survives by default');
+  assert.equal(await cleared({ resetBrowserData: 'true' }), true);
+});
+
+test('a tab whose close never settles does not block the rest of the sweep', async () => {
+  const saved = process.env.PWM_TAB_CLOSE_TIMEOUT_MS;
+  process.env.PWM_TAB_CLOSE_TIMEOUT_MS = '50';
+  try {
+    const launched = new FakePage('about:blank');
+    const hung = new FakePage('https://hung.example/', () => new Promise(() => {}));
+    const context = fakeContext([launched, hung]);
+    const driver = await launchContext(context);
+    const popup = await context.newPage();
+
+    await driver.onContextTeardown(context);
+
+    assert.equal(popup.isClosed(), true, 'a wedged tab does not strand the others');
+    assert.equal(hung.isClosed(), false, 'the wedged tab is reported, not waited on');
+  } finally {
+    if (saved === undefined) delete process.env.PWM_TAB_CLOSE_TIMEOUT_MS;
+    else process.env.PWM_TAB_CLOSE_TIMEOUT_MS = saved;
+  }
+});
+
 test('a consumer-created page is patched like the fixture page', async () => {
   const created = [];
   const page = { name: 'page' };
@@ -201,4 +344,14 @@ test('a consumer-created page is patched like the fixture page', async () => {
 
 test('patching newPage tolerates a context without one', () => {
   assert.doesNotThrow(() => patchContextNewPage({}, () => {}));
+});
+
+test('patching close tolerates a context without one, and a failing hook', async () => {
+  assert.doesNotThrow(() => patchContextClose({}, () => {}));
+
+  let closed = false;
+  const context = { async close() { closed = true; } };
+  patchContextClose(context, async () => { throw new Error('sweep exploded'); });
+  await context.close();
+  assert.equal(closed, true, 'a broken sweep never blocks the close it precedes');
 });

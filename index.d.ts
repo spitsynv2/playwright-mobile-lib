@@ -156,8 +156,17 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   browsingMode?: BrowsingMode | (string & {});
   /** iOS: skip the between-tests Safari cleanup. */
   skipSafariCleanup?: GateFlag;
-  /** Close the tab after each test. iOS closes the native tab; Android prunes tabs before context close. */
+  /**
+   * Close the tab after each test. iOS closes the native tab; Android sweeps the
+   * context's tabs both when the browser is launched and before the context closes.
+   */
   closeTabAfterTest?: GateFlag;
+  /**
+   * Android: clear the browser package's data before each launch. Off by default.
+   * Tabs Chrome restores without reloading have no CDP target and cannot be swept,
+   * so this is the only way to reclaim them — at the cost of the whole profile.
+   */
+  resetBrowserData?: GateFlag;
   /** iOS: bridge nav-kick retry gate. */
   navKickEnabled?: GateFlag;
   /** iOS: bridge click-nav retry gate. */
