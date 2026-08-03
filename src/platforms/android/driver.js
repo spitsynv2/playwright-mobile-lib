@@ -35,9 +35,15 @@ const DEFAULT_LOCAL_ANDROID_DEVICE = 'Pixel 7';
 // Default mirrors the iOS bridge (`private`); on Android this is best-effort
 // (--incognito may be ignored). See android_browsing_modes plan for parity.
 const DEFAULT_ANDROID_BROWSING_MODE = 'private';
-const BROWSING_MODES = new Set([
-  'public', 'private', 'single-tab-public', 'single-tab-private',
-]);
+const BROWSING_MODES = new Set(['public', 'private']);
+
+// Chrome is force-stopped and relaunched per test, so no tab can span a run; a
+// single-tab request degrades to its base mode instead of pretending otherwise.
+const SINGLE_TAB_BASE_MODES = {
+  'single-tab': 'public',
+  'single-tab-public': 'public',
+  'single-tab-private': 'private',
+};
 
 // Prepended to launchBrowser args so a relaunched Chrome does not restore the
 // previous test's growing tab set (support varies by Chrome build).
@@ -53,18 +59,24 @@ const SCREEN_CAPTURE_FEATURE_ARGS = [
   '--enable-features=CDPScreenshotNewSurface,IncognitoScreenshot,ImprovedIncognitoScreenshot',
 ];
 
+let warnedSingleTab = false;
+
 function normalizeBrowsingMode(value) {
   const v = String(value || '').trim().toLowerCase();
-  if (v === 'single-tab') return 'single-tab-public';
-  return BROWSING_MODES.has(v) ? v : DEFAULT_ANDROID_BROWSING_MODE;
-}
-
-function isSingleTab(mode) {
-  return mode === 'single-tab-public' || mode === 'single-tab-private';
+  const base = SINGLE_TAB_BASE_MODES[v];
+  if (!base) return BROWSING_MODES.has(v) ? v : DEFAULT_ANDROID_BROWSING_MODE;
+  if (!warnedSingleTab) {
+    warnedSingleTab = true;
+    console.warn(
+      `android: browsingMode '${v}' is iOS-only — Chrome relaunches per test, so no tab `
+      + `survives one; running as '${base}'`,
+    );
+  }
+  return base;
 }
 
 function isPrivateMode(mode) {
-  return mode === 'private' || mode === 'single-tab-private';
+  return mode === 'private';
 }
 
 // launchBrowser() opens a tab per test (`am start -d about:blank`) and Android
@@ -284,9 +296,6 @@ const contextsWithoutArtifactRail = new WeakSet();
 // context.close(); absent when the run opted out of tab pruning.
 const contextTabSweep = new WeakMap();
 
-// The page createPage handed to the test, kept as the survivor of a single-tab sweep.
-const contextPrimaryPage = new WeakMap();
-
 const SCREENSHOT_TIMEOUT_MS = 10_000;
 
 function resolveScreenshotOption(testInfo) {
@@ -416,11 +425,7 @@ const driver = {
       }
       patchContextNewPage(context, ensureAndroidPrototypesPatched);
       if (pruneTabsEnabled) {
-        const sweep = () => sweepTabs(
-          context,
-          isSingleTab(mode) ? contextPrimaryPage.get(context) || null : null,
-          'teardown',
-        );
+        const sweep = () => sweepTabs(context, null, 'teardown');
         contextTabSweep.set(context, sweep);
         patchContextClose(context, sweep);
       }
@@ -443,7 +448,6 @@ const driver = {
     const existing = typeof context.pages === 'function' ? context.pages() : [];
     const page = existing[0] || await context.newPage();
     ensureAndroidPrototypesPatched(page);
-    contextPrimaryPage.set(context, page);
 
     // Handshake: pull the bridge's per-test session id and device metadata at test
     // start and push them to Zebrunner. On a local/ADB run (no bridge) the sentinel

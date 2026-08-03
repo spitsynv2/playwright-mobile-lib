@@ -222,6 +222,10 @@ function fakeContext(pages = []) {
       all.push(page);
       return page;
     },
+    // Stands in for the incognito tab the private-mode intent opens.
+    async waitForEvent(event) {
+      return event === 'page' ? context.newPage() : null;
+    },
     async close() {
       context.closeCalls += 1;
       context.pagesAtClose = context.pages().length;
@@ -274,18 +278,16 @@ test('Android hands the test the launch tab instead of opening a second one', as
   }
 });
 
-test('Android teardown keeps the fixture tab in single-tab mode', async () => {
-  const launched = new FakePage('about:blank');
-  const context = fakeContext([launched]);
-  const driver = await launchContext(context, { browsingMode: 'single-tab-public' });
-  const page = await driver.createPage(context, {});
-  const popup = await context.newPage();
+test('Android runs a single-tab mode as its base mode and still ends at zero tabs', async () => {
+  for (const browsingMode of ['single-tab-public', 'single-tab-private', 'single-tab']) {
+    const context = fakeContext([new FakePage('about:blank')]);
+    const driver = await launchContext(context, { browsingMode });
+    await driver.createPage(context, {});
 
-  await driver.onContextTeardown(context);
+    await driver.onContextTeardown(context);
 
-  assert.equal(page, launched, 'single-tab reuses the launch tab');
-  assert.equal(popup.isClosed(), true, 'extra tabs still go');
-  assert.deepEqual(context.pages(), [launched], 'the one tab the mode promises stays');
+    assert.equal(context.pages().length, 0, `${browsingMode} keeps no tab across tests`);
+  }
 });
 
 test('a test that closes the context itself sweeps its tabs first', async () => {

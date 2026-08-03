@@ -135,6 +135,10 @@ all four modes with full isolation. On Android, `private` is best-effort: where
 the device's browser cannot provide an isolated tab, the run continues in the
 normal profile with a warning instead of failing.
 
+`single-tab-*` is iOS-only. Android force-stops and relaunches Chrome for every
+test, so no tab can span a run; a single-tab request there runs as `public` or
+`private` and warns once. Use the plain modes on Android.
+
 `browsingMode: process.env.BROWSING_MODE || 'private'` needs no cast. The
 library accepts `public`, `private`, `single-tab-public`,
 `single-tab-private`, and the legacy `single-tab` alias, ignoring surrounding
