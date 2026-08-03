@@ -261,6 +261,19 @@ test('Android teardown closes every tab the test left open', async () => {
   assert.equal(context.pages().length, 0);
 });
 
+test('Android hands the test the launch tab instead of opening a second one', async () => {
+  for (const browsingMode of ['public', 'single-tab-public']) {
+    const launched = new FakePage('about:blank');
+    const context = fakeContext([launched]);
+    const driver = await launchContext(context, { browsingMode });
+
+    const page = await driver.createPage(context, {});
+
+    assert.equal(page, launched, `${browsingMode} drives the tab launchBrowser() opened`);
+    assert.equal(context.pages().length, 1, `${browsingMode} leaves no stranded about:blank`);
+  }
+});
+
 test('Android teardown keeps the fixture tab in single-tab mode', async () => {
   const launched = new FakePage('about:blank');
   const context = fakeContext([launched]);

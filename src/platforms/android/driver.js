@@ -136,14 +136,15 @@ const INCOGNITO_PAGE_TIMEOUT_MS = 10_000;
 async function openIncognitoPage(connection, context, pkg) {
   const before = new Set(context.pages());
   const arrival = context.waitForEvent('page', { timeout: INCOGNITO_PAGE_TIMEOUT_MS }).catch(() => null);
+  let started = true;
   try {
     await connection.shell(`am start -n ${pkg}/${INCOGNITO_LAUNCHER}`);
   } catch {
-    return null;
+    started = false;
   }
-  let incognito = await arrival;
+  let incognito = started ? await arrival : null;
   if (!incognito) incognito = context.pages().find((p) => !before.has(p)) || null;
-  // The intent already opened a tab even when it never surfaced; leave no orphan.
+  // The intent can open a tab even when it reports failure or never surfaces here.
   if (!incognito) {
     await pruneTabs(context, [...before][0] || launchPage(context));
     return null;
@@ -274,10 +275,6 @@ function ensureAndroidPrototypesPatched(probePage) {
 // The Chrome build the launched context runs on, read from the device package
 // manager over adb so Zebrunner reporting shows the real browserVersion.
 const contextBrowserVersion = new WeakMap();
-
-// Resolved browsing mode per context, so createPage can decide tab reuse without
-// re-reading capabilities from the fixture.
-const contextBrowsingMode = new WeakMap();
 
 // ArtifactsRecorder scans only chromium/firefox/webkit `_contexts`, so launchBrowser()
 // contexts get no `use.screenshot` capture and newContext() ones must not be captured twice.
@@ -412,7 +409,6 @@ const driver = {
       const context = await connection.launchBrowser(launchOptions);
       await applyRegisteredSelectors(context);
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
-      contextBrowsingMode.set(context, mode);
       contextsWithoutArtifactRail.add(context);
       if (pruneTabsEnabled) await sweepTabs(context, launchPage(context), 'launch');
       if (isPrivateMode(mode) && !(await openIncognitoPage(connection, context, pkg))) {
@@ -431,7 +427,6 @@ const driver = {
       return context;
     }
     const context = await connection.newContext({ ...preset, ...extraContextOptions });
-    contextBrowsingMode.set(context, mode);
     patchContextNewPage(context, ensureAndroidPrototypesPatched);
     return context;
   },
@@ -443,12 +438,10 @@ const driver = {
   },
 
   async createPage(context, { deviceInfo, testInfo } = {}) {
-    const mode = contextBrowsingMode.get(context) || DEFAULT_ANDROID_BROWSING_MODE;
+    // launchBrowser() already opened a tab; newPage() here would strand it, and in
+    // private mode it would also land outside the adopted incognito tab.
     const existing = typeof context.pages === 'function' ? context.pages() : [];
-    // Reuse the existing tab for single-tab modes and for private (newPage would
-    // open a non-incognito tab); only `public` opens a fresh tab per page (#26800).
-    const reuseFirst = existing.length > 0 && (isSingleTab(mode) || isPrivateMode(mode));
-    const page = reuseFirst ? existing[0] : await context.newPage();
+    const page = existing[0] || await context.newPage();
     ensureAndroidPrototypesPatched(page);
     contextPrimaryPage.set(context, page);
 
