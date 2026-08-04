@@ -6,8 +6,9 @@
 
 // Component sources for the farm's combined session.log. Verbosity is controlled
 // per source via capabilities.logLevels (e.g. { bridge: 'debug',
-// inspector: 'off' }); a level of 'off' removes that source from the bundle. An
-// unset level keeps the orchestrator default.
+// inspector: 'off' }); a level of 'off' disables that component's configured
+// debug logging, though launcher/lifecycle lines may remain. An unset level
+// keeps the orchestrator default.
 const SESSION_LOG_NAMES = ['bridge', 'pwserver', 'inspector'];
 const VALID_LOG_LEVELS = new Set(['off', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']);
 

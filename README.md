@@ -34,7 +34,7 @@ npm install
 `@zebrunner/javascript-agent-playwright` is an optional peer dependency. Install
 and configure it only when Zebrunner reporting is needed.
 
-Node.js 22 or newer is required; Node 24 (the current LTS) is recommended. The
+Node.js 22 or newer is required; Node 24 LTS is recommended. The
 `playwright` and `@playwright/test` versions used by tests must match the
 Playwright version the device containers run. The mobile orchestrator reads the
 client version from Playwright's connect `User-Agent` and starts or restarts
@@ -122,12 +122,12 @@ no environment-variable fallbacks for device capabilities.
 | `deviceUuid` | `string` | iOS device UDID pool-match filter. |
 | `osVersion` | `string` | OS-version pool-match filter. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
-| `skipSafariCleanup` | `boolean` | iOS only: skip between-test Safari cleanup. |
+| `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
 | `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled; enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
-| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | iOS only: per-component verbosity for the combined farm `session.log`. `off` removes that source from the bundle; other values are `fatal`, `error`, `warn`, `info`, `debug`, or `trace`. |
+| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Per-container verbosity. iOS uses all three sources and restarts a warm container when the set changes. Android forwards `bridge` and `pwserver` when starting its container; `inspector` is iOS-only. The Go bridge and Playwright server implement `off`/`info`/`debug`/`trace`; the iOS container normalizes inspector aliases `fatal`/`warn` to Uvicorn's `critical`/`warning`. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
 reuses one tab for the whole run instead of opening a tab per page. iOS honors
@@ -297,7 +297,7 @@ Context options set under `use` in the config, at the top level or per project,
 are honored where the device can honor them and reported where it cannot. What a
 device accepts differs sharply by platform, so the two are listed separately.
 
-**Android honors the ordinary Playwright set.** The launched Chrome context
+**A real Android device honors the ordinary Playwright set.** The launched Chrome context
 accepts `baseURL`, `viewport`, `locale`, `timezoneId`, `geolocation`,
 `permissions`, `offline`, `extraHTTPHeaders`, `httpCredentials`,
 `ignoreHTTPSErrors`, `bypassCSP`, `javaScriptEnabled`, `serviceWorkers`,
@@ -342,10 +342,13 @@ browser selection and startup: `browserName`, `defaultBrowserType`, `headless`,
 to pick the platform, `capabilities.args` for Android browser flags, and
 `PWM_ORCHESTRATOR` for the connection.
 
-Unaffected everywhere: `baseURL`, `trace`, `screenshot`, `testIdAttribute`,
-`actionTimeout`, and `navigationTimeout`. The raw `use: { contextOptions }`
-escape hatch is read the same way as the top-level options, with top-level
-values winning.
+Runner-side `trace`, `screenshot`, `testIdAttribute`, `actionTimeout`, and
+`navigationTimeout` remain available on both platforms. Ordinary `use` context
+options, including `baseURL`, are forwarded on a real Android device. iOS and
+local WebKit/Chromium pre-flight build the context from the resolved device
+preset plus `extraContextOptions`, so put context options there when the same
+config must work on every path. On real Android, the raw
+`use: { contextOptions }` escape hatch is read with top-level values winning.
 
 Both the forwarding and the warnings read the config, so a per-file
 `test.use({ viewport })` is not covered by either. Use
@@ -368,13 +371,22 @@ request while a mid-test resize is not.
 ## Environment variables
 
 The library reads `process.env` and does not load `.env` files itself. Load them
-in the consuming project, for example with `dotenv`.
+in the consuming project before importing `playwright-mobile-lib`, because
+connection paths, timeouts, reporting, and ADB settings are captured during
+module initialization. For example:
+
+```js
+require('dotenv').config();
+const { test, expect } = require('playwright-mobile-lib');
+```
 
 | Variable | Purpose |
 | --- | --- |
 | `PWM_ORCHESTRATOR` | Orchestrator base URL. The per-platform route is derived from it. Leave unset for local runs. |
 | `IOS_WS_ENDPOINT` | Full iOS WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for iOS. |
 | `ANDROID_WS_ENDPOINT` | Full Android WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for Android. |
+| `PWM_IOS_WS_PATH` | iOS route appended to `PWM_ORCHESTRATOR`. Defaults to `/safari`. |
+| `PWM_ANDROID_WS_PATH` | Android route appended to `PWM_ORCHESTRATOR`. Defaults to `/playwright`. |
 | `PWM_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. Defaults to `120000`; the connection fixture timeout is this value plus 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
 | `PWM_CLIENT_ID` | Stable `x-pwm-client-id` used for device pinning across reconnects. When absent, a unique ID is generated once per worker process. The legacy `IOS_CLIENT_ID` is still accepted. |
 | `PWM_TAB_CLOSE_TIMEOUT_MS` | Android: how long a single tab close may take during a sweep before the run moves on. Defaults to `5000`. |
@@ -383,6 +395,10 @@ in the consuming project, for example with `dotenv`.
 | `PWM_AUTH_USER` | Basic-auth username used when neither raw-header nor bearer auth is set. |
 | `PWM_AUTH_PASSWORD` | Basic-auth password paired with `PWM_AUTH_USER`. |
 | `PLAYWRIGHT_SLOW_MO_MS` | Non-negative delay between Playwright operations in milliseconds. Defaults to `0`. |
+| `ANDROID_SERIAL` | Direct-ADB device serial used when no WebSocket endpoint is configured. |
+| `PWM_ANDROID_ADB` | Set exactly to `true` to select a direct ADB device without a serial; exactly one device must be available. |
+| `ADB_SERVER_HOST` / `ADB_SERVER_PORT` | Direct-ADB server address. Defaults to `127.0.0.1:5037`. |
+| `ANDROID_OMIT_DRIVER_INSTALL` | Set exactly to `true` to skip Playwright's Android driver installation in direct-ADB mode. |
 | `REPORTING_ENABLED` | Set exactly to `true` to enable the optional Zebrunner integration. Defaults to disabled. |
 
 Authentication is intended for an orchestrator behind an auth proxy. The

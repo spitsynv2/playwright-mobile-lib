@@ -45,17 +45,17 @@ export function resolveIOSDevicePreset(
  */
 export function withAppiumInputMode<T>(page: Page, fn: () => Promise<T> | T): Promise<T>;
 
-/** Per-session container log verbosity. `'off'` removes that source from the combined session log. */
+/** Per-container log verbosity. `'off'` disables that component's configured debug logging. */
 export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 /**
  * On/off capability. Prefer a boolean; `'true'` / `'false'` (also `'1'` / `'0'`)
- * are accepted so an environment variable can be passed through unparsed. An
- * unparseable value is rejected at connect time.
+ * are accepted so an environment variable can be passed through unparsed.
+ * Farm validation rejects invalid strings; local drivers treat them as unset.
  */
 export type GateFlag = boolean | 'true' | 'false' | (string & {});
 
-/** Component sources for the combined iOS session log. */
+/** Container log sources; `inspector` is iOS-only. */
 export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
 
 /**
@@ -156,7 +156,7 @@ export interface Capabilities extends AndroidLaunchCapabilities {
    * unparsed; an unrecognized mode throws when the session starts.
    */
   browsingMode?: BrowsingMode | (string & {});
-  /** iOS: skip the between-tests Safari cleanup. */
+  /** iOS: skip Safari history/data cleanup when the bridge starts. */
   skipSafariCleanup?: GateFlag;
   /**
    * Close the tab after each test. iOS closes the native tab; Android sweeps the
@@ -173,7 +173,7 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   navKickEnabled?: GateFlag;
   /** iOS: bridge click-nav retry gate. */
   clickNavRetriesEnabled?: GateFlag;
-  /** iOS: per-component verbosity for the combined farm `session.log`. */
+  /** Per-container verbosity; Android uses `bridge` and `pwserver`, while `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
 }
 
