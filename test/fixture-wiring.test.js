@@ -117,7 +117,7 @@ test('iOS resolves a known device the same way on both run modes', () => {
 // launchBrowser() is the only surface that sees these options; the returned
 // context stays minimal so createContext takes its non-incognito path.
 function fakeAndroidDevice(context = { pages: () => [] }) {
-  const calls = { launchOptions: null, shell: [] };
+  const calls = { launchOptions: null, shell: [], launches: 0 };
   return {
     calls,
     async shell(command) {
@@ -126,6 +126,7 @@ function fakeAndroidDevice(context = { pages: () => [] }) {
     },
     async launchBrowser(options) {
       calls.launchOptions = options;
+      calls.launches += 1;
       return context;
     },
   };
@@ -199,11 +200,25 @@ class FakePage {
     this._url = url;
     this._closed = false;
     this._onClose = onClose;
+    this.bridgeOps = [];
   }
 
   url() { return this._url; }
 
+  context() { return this._context; }
+
   isClosed() { return this._closed; }
+
+  async goto(url) { this._url = url; }
+
+  // Stands in for the Go bridge answering the page.bridge.<op> sentinel.
+  async evaluate(expression) {
+    const { op } = JSON.parse(String(expression).replace('__pwm_bridge_call__:', ''));
+    this.bridgeOps.push(op);
+    if (op === 'startSession') return `session-${this.bridgeOps.length}`;
+    if (op === 'endSession') return 'ended';
+    throw new Error(`FakePage: unsupported bridge op ${op}`);
+  }
 
   async close() {
     if (this._onClose) await this._onClose();
@@ -219,6 +234,7 @@ function fakeContext(pages = []) {
     pages: () => all.filter((page) => !page.isClosed()),
     async newPage() {
       const page = new FakePage('about:blank');
+      page._context = context;
       all.push(page);
       return page;
     },
@@ -231,6 +247,7 @@ function fakeContext(pages = []) {
       context.pagesAtClose = context.pages().length;
     },
   };
+  for (const page of all) page._context = context;
   return context;
 }
 
@@ -278,15 +295,78 @@ test('Android hands the test the launch tab instead of opening a second one', as
   }
 });
 
-test('Android runs a single-tab mode as its base mode and still ends at zero tabs', async () => {
+// One test of a single-tab worker: reuse the context, drive the managed tab,
+// then run the teardown the fixture would.
+async function runSingleTabTest(driver, connection, browsingMode) {
+  const context = await driver.createContext(connection, {
+    preset: {},
+    extraContextOptions: {},
+    capabilities: { platformName: 'Android', browsingMode },
+  });
+  const page = await driver.createPage(context, {});
+  await driver.onPageTeardown(page, { project: {} });
+  await driver.onContextTeardown(context);
+  await driver.closeContext(context);
+  return { context, page };
+}
+
+test('Android single-tab launches Chrome once and hands every test the same tab', async () => {
+  const launched = new FakePage('about:blank');
+  const context = fakeContext([launched]);
+  const connection = fakeAndroidDevice(context);
+  const driver = selectDriver('Android');
+
+  const first = await runSingleTabTest(driver, connection, 'single-tab-public');
+  const second = await runSingleTabTest(driver, connection, 'single-tab-public');
+
+  assert.equal(connection.calls.launches, 1, 'the second test reuses the launched Chrome');
+  assert.equal(second.context, first.context, 'the worker keeps the context it launched');
+  assert.equal(second.page, first.page, 'both tests drive the same tab');
+  assert.equal(context.closeCalls, 0, 'the fixture never closes a single-tab context');
+});
+
+test('Android single-tab brackets each test with its own bridge session', async () => {
+  const launched = new FakePage('about:blank');
+  const connection = fakeAndroidDevice(fakeContext([launched]));
+  const driver = selectDriver('Android');
+
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+
+  assert.deepEqual(
+    launched.bridgeOps.filter((op) => op !== 'getDeviceInfo'),
+    ['startSession', 'endSession', 'startSession', 'endSession'],
+  );
+});
+
+test('Android single-tab resets the reused tab before the next test runs', async () => {
+  const launched = new FakePage('about:blank');
+  const connection = fakeAndroidDevice(fakeContext([launched]));
+  const driver = selectDriver('Android');
+
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+  launched._url = 'https://example.com/checkout';
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+
+  assert.equal(launched.url(), 'about:blank', 'the previous test\'s document does not leak in');
+});
+
+test('Android single-tab keeps its tab at teardown and prunes only what a test opened', async () => {
   for (const browsingMode of ['single-tab-public', 'single-tab-private', 'single-tab']) {
     const context = fakeContext([new FakePage('about:blank')]);
-    const driver = await launchContext(context, { browsingMode });
-    await driver.createPage(context, {});
+    const driver = selectDriver('Android');
+    await driver.createContext(fakeAndroidDevice(context), {
+      preset: {},
+      extraContextOptions: {},
+      capabilities: { platformName: 'Android', browsingMode },
+    });
+    const managed = context.pages()[0];
+    const popup = await context.newPage();
 
     await driver.onContextTeardown(context);
 
-    assert.equal(context.pages().length, 0, `${browsingMode} keeps no tab across tests`);
+    assert.equal(popup.isClosed(), true, `${browsingMode} still prunes a stray tab`);
+    assert.deepEqual(context.pages(), [managed], `${browsingMode} carries one tab into the next test`);
   }
 });
 

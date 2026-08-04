@@ -67,9 +67,10 @@ export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
  *
  * iOS Safari honors all four with full isolation. On Android, `private` is
  * best-effort: where the device's browser cannot provide an isolated tab, the
- * run continues in the normal profile with a warning instead of failing, and
- * `single-tab-*` is iOS-only — Chrome is relaunched per test, so no tab survives
- * one, and the run falls back to `public` / `private` with a warning.
+ * run continues in the normal profile with a warning instead of failing. A
+ * `single-tab-*` Android run launches Chrome once per worker and reuses that tab
+ * for every test, so cookies and storage persist across tests in the worker and
+ * `resetBrowserData` applies only at worker start.
  */
 export type BrowsingMode =
   | 'public'

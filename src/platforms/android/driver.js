@@ -35,15 +35,13 @@ const DEFAULT_LOCAL_ANDROID_DEVICE = 'Pixel 7';
 // Default mirrors the iOS bridge (`private`); on Android this is best-effort
 // (--incognito may be ignored). See android_browsing_modes plan for parity.
 const DEFAULT_ANDROID_BROWSING_MODE = 'private';
-const BROWSING_MODES = new Set(['public', 'private']);
+const BROWSING_MODES = new Set([
+  'public', 'private', 'single-tab-public', 'single-tab-private',
+]);
 
-// Chrome is force-stopped and relaunched per test, so no tab can span a run; a
-// single-tab request degrades to its base mode instead of pretending otherwise.
-const SINGLE_TAB_BASE_MODES = {
-  'single-tab': 'public',
-  'single-tab-public': 'public',
-  'single-tab-private': 'private',
-};
+// Matches the orchestrator and the iOS bridge, which both read bare `single-tab`
+// as the public variant.
+const LEGACY_SINGLE_TAB = 'single-tab';
 
 // Prepended to launchBrowser args so a relaunched Chrome does not restore the
 // previous test's growing tab set (support varies by Chrome build).
@@ -59,24 +57,18 @@ const SCREEN_CAPTURE_FEATURE_ARGS = [
   '--enable-features=CDPScreenshotNewSurface,IncognitoScreenshot,ImprovedIncognitoScreenshot',
 ];
 
-let warnedSingleTab = false;
-
 function normalizeBrowsingMode(value) {
   const v = String(value || '').trim().toLowerCase();
-  const base = SINGLE_TAB_BASE_MODES[v];
-  if (!base) return BROWSING_MODES.has(v) ? v : DEFAULT_ANDROID_BROWSING_MODE;
-  if (!warnedSingleTab) {
-    warnedSingleTab = true;
-    console.warn(
-      `android: browsingMode '${v}' is iOS-only — Chrome relaunches per test, so no tab `
-      + `survives one; running as '${base}'`,
-    );
-  }
-  return base;
+  if (v === LEGACY_SINGLE_TAB) return 'single-tab-public';
+  return BROWSING_MODES.has(v) ? v : DEFAULT_ANDROID_BROWSING_MODE;
 }
 
 function isPrivateMode(mode) {
-  return mode === 'private';
+  return mode === 'private' || mode === 'single-tab-private';
+}
+
+function isSingleTab(mode) {
+  return mode === 'single-tab-public' || mode === 'single-tab-private';
 }
 
 // launchBrowser() opens a tab per test (`am start -d about:blank`) and Android
@@ -296,6 +288,36 @@ const contextsWithoutArtifactRail = new WeakSet();
 // context.close(); absent when the run opted out of tab pruning.
 const contextTabSweep = new WeakMap();
 
+// Single-tab mode only: the worker's one launched context (keyed by the
+// worker-scoped connection) and the one tab every test in that worker reuses.
+const singleTabContexts = new WeakMap();
+const singleTabPages = new WeakMap();
+
+const SINGLE_TAB_RESET_TIMEOUT_MS = 10_000;
+
+// about:blank is the whole reset: cookies and storage deliberately survive the
+// test boundary, matching iOS single-tab.
+async function resetSingleTab(page) {
+  if (page.url() === 'about:blank') return;
+  try {
+    await page.goto('about:blank', { timeout: SINGLE_TAB_RESET_TIMEOUT_MS });
+  } catch (error) {
+    console.warn(`android: single-tab reset to about:blank failed (${error.message})`);
+  }
+}
+
+// A closed managed tab means Chrome died or the test closed it, so the cache is
+// dropped and the next test relaunches rather than driving a dead context.
+function liveSingleTabContext(connection) {
+  const context = singleTabContexts.get(connection);
+  if (!context) return null;
+  const page = singleTabPages.get(context);
+  if (page && !page.isClosed()) return context;
+  singleTabContexts.delete(connection);
+  singleTabPages.delete(context);
+  return null;
+}
+
 const SCREENSHOT_TIMEOUT_MS = 10_000;
 
 function resolveScreenshotOption(testInfo) {
@@ -396,6 +418,13 @@ const driver = {
     const mode = normalizeBrowsingMode(caps.browsingMode);
     // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
+      const singleTab = isSingleTab(mode);
+      // launchBrowser() force-stops Chrome, so a single-tab run may only launch
+      // once per worker; every later test drives the context it already opened.
+      if (singleTab) {
+        const cached = liveSingleTabContext(connection);
+        if (cached) return cached;
+      }
       const pkg = caps.pkg || 'com.android.chrome';
       const pruneTabsEnabled = gateFlag(caps.closeTabAfterTest) !== false;
       await connection.shell(`am force-stop ${pkg}`);
@@ -420,12 +449,27 @@ const driver = {
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
       contextsWithoutArtifactRail.add(context);
       if (pruneTabsEnabled) await sweepTabs(context, launchPage(context), 'launch');
-      if (isPrivateMode(mode) && !(await openIncognitoPage(connection, context, pkg))) {
-        console.warn(`android: incognito tab did not surface for mode '${mode}'; continuing in normal profile`);
+      let managedPage = null;
+      if (isPrivateMode(mode)) {
+        managedPage = await openIncognitoPage(connection, context, pkg);
+        if (!managedPage) {
+          console.warn(`android: incognito tab did not surface for mode '${mode}'; continuing in normal profile`);
+        }
       }
       patchContextNewPage(context, ensureAndroidPrototypesPatched);
+      if (singleTab) {
+        const tab = managedPage || launchPage(context);
+        if (tab) {
+          singleTabContexts.set(connection, context);
+          singleTabPages.set(context, tab);
+        } else {
+          console.warn(`android: no tab to adopt for mode '${mode}'; relaunching Chrome per test instead`);
+        }
+      }
       if (pruneTabsEnabled) {
-        const sweep = () => sweepTabs(context, null, 'teardown');
+        // The single-tab managed tab spans the whole worker, so its teardown
+        // prunes only what a test opened; other modes drop every tab.
+        const sweep = () => sweepTabs(context, singleTabPages.get(context) || null, 'teardown');
         contextTabSweep.set(context, sweep);
         patchContextClose(context, sweep);
       }
@@ -442,11 +486,19 @@ const driver = {
     if (sweep) await sweep();
   },
 
+  // A single-tab context outlives the test that first launched it; closing it
+  // here would kill Chrome and strand the tab the next test has to reuse.
+  async closeContext(context) {
+    if (singleTabPages.has(context)) return;
+    await context.close();
+  },
+
   async createPage(context, { deviceInfo, testInfo } = {}) {
     // launchBrowser() already opened a tab; newPage() here would strand it, and in
     // private mode it would also land outside the adopted incognito tab.
+    const managed = singleTabPages.get(context);
     const existing = typeof context.pages === 'function' ? context.pages() : [];
-    const page = existing[0] || await context.newPage();
+    const page = managed || existing[0] || await context.newPage();
     ensureAndroidPrototypesPatched(page);
 
     // Handshake: pull the bridge's per-test session id and device metadata at test
@@ -454,6 +506,19 @@ const driver = {
     // evaluate throws and is swallowed, leaving sessionId empty.
     let sessionId = '';
     let resolvedDeviceInfo = deviceInfo || { platformName: 'Android' };
+    // A reused tab still holds the previous test's document, and its marker only
+    // opens here, so both must happen before the body runs.
+    if (managed) {
+      await resetSingleTab(managed);
+      try {
+        sessionId = await page.bridge.startSession();
+      } catch (error) {
+        console.warn(
+          `android: single-tab startSession failed (${error.message}); `
+          + 'this test may share the previous session slice',
+        );
+      }
+    }
     try {
       const rawDeviceInfo = await page.bridge.getDeviceInfo();
       const bridgeDeviceInfo = typeof rawDeviceInfo === 'string'
@@ -469,9 +534,11 @@ const driver = {
     } catch {}
     const browserVersion = contextBrowserVersion.get(context) || '';
     if (browserVersion) resolvedDeviceInfo = { ...resolvedDeviceInfo, browserVersion };
-    try {
-      sessionId = await page.bridge.getSessionId();
-    } catch {}
+    if (!sessionId) {
+      try {
+        sessionId = await page.bridge.getSessionId();
+      } catch {}
+    }
     if (sessionId && testInfo) {
       const reportingCapabilities = buildSessionCapabilities('Android', resolvedDeviceInfo);
       testInfo.annotations.push({ type: 'sessionId', description: sessionId });
@@ -483,17 +550,26 @@ const driver = {
   },
 
   async onPageTeardown(page, testInfo) {
-    if (page.isClosed() || !contextsWithoutArtifactRail.has(page.context())) return;
-    const { mode, options } = resolveScreenshotOption(testInfo);
-    if (!shouldCaptureScreenshot(mode, testInfo)) return;
-    try {
-      const buffer = await page.screenshot({
-        ...options,
-        caret: 'initial',
-        timeout: SCREENSHOT_TIMEOUT_MS,
-      });
-      await testInfo.attach('screenshot', { body: buffer, contentType: 'image/png' });
-    } catch {}
+    if (page.isClosed()) return;
+    if (contextsWithoutArtifactRail.has(page.context())) {
+      const { mode, options } = resolveScreenshotOption(testInfo);
+      if (shouldCaptureScreenshot(mode, testInfo)) {
+        try {
+          const buffer = await page.screenshot({
+            ...options,
+            caret: 'initial',
+            timeout: SCREENSHOT_TIMEOUT_MS,
+          });
+          await testInfo.attach('screenshot', { body: buffer, contentType: 'image/png' });
+        } catch {}
+      }
+    }
+    // Must run after the screenshot so the capture lands inside this test's slice.
+    if (singleTabPages.get(page.context()) === page) {
+      try {
+        await page.bridge.endSession();
+      } catch {}
+    }
   },
 };
 

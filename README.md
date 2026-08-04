@@ -123,7 +123,7 @@ no environment-variable fallbacks for device capabilities.
 | `osVersion` | `string` | OS-version pool-match filter. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip between-test Safari cleanup. |
-| `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
+| `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched; in a `single-tab-*` run the sweep spares the reused tab. |
 | `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled; enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
@@ -135,9 +135,13 @@ all four modes with full isolation. On Android, `private` is best-effort: where
 the device's browser cannot provide an isolated tab, the run continues in the
 normal profile with a warning instead of failing.
 
-`single-tab-*` is iOS-only. Android force-stops and relaunches Chrome for every
-test, so no tab can span a run; a single-tab request there runs as `public` or
-`private` and warns once. Use the plain modes on Android.
+On Android, `public` and `private` force-stop and relaunch Chrome for every test,
+so each test starts on a fresh tab. A `single-tab-*` run instead launches Chrome
+once per worker and hands every test the same tab, reset to `about:blank` before
+the test body. Cookies and storage therefore persist across the tests in a
+worker, and `resetBrowserData` only applies at worker start. The bridge still
+opens a session per test, so per-test video and `sessionId` reporting is
+unchanged.
 
 `browsingMode: process.env.BROWSING_MODE || 'private'` needs no cast. The
 library accepts `public`, `private`, `single-tab-public`,

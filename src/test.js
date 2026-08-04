@@ -78,7 +78,8 @@ const test = base.extend({
       }
       // Connection may already be gone; closing a dead context throws.
       try {
-        await context.close();
+        if (typeof _driver.closeContext === 'function') await _driver.closeContext(context);
+        else await context.close();
       } catch {}
     }
   },
