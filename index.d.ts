@@ -70,7 +70,8 @@ export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
  * run continues in the normal profile with a warning instead of failing. A
  * `single-tab-*` Android run launches Chrome once per worker and reuses that tab
  * for every test, so cookies and storage persist across tests in the worker and
- * `resetBrowserData` applies only at worker start.
+ * `resetBrowserData` applies only at worker start. A test that sets its own
+ * `extraContextOptions` relaunches Chrome, since those apply at launch.
  */
 export type BrowsingMode =
   | 'public'

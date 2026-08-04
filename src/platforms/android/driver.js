@@ -292,12 +292,29 @@ const contextTabSweep = new WeakMap();
 // worker-scoped connection) and the one tab every test in that worker reuses.
 const singleTabContexts = new WeakMap();
 const singleTabPages = new WeakMap();
+const singleTabSignatures = new WeakMap();
+const singleTabLaunchOptions = new WeakMap();
 
 const SINGLE_TAB_RESET_TIMEOUT_MS = 10_000;
 
-// about:blank is the whole reset: cookies and storage deliberately survive the
-// test boundary, matching iOS single-tab.
+// Page events a test may subscribe to. `close` and `crash` are left alone
+// because Playwright tracks page lifecycle through them.
+const RESETTABLE_PAGE_EVENTS = [
+  'console', 'dialog', 'domcontentloaded', 'download', 'filechooser',
+  'frameattached', 'framedetached', 'framenavigated', 'load', 'pageerror',
+  'popup', 'request', 'requestfailed', 'requestfinished', 'response',
+  'websocket', 'worker',
+];
+
+// The tab outlives the test that configured it, so listeners have to go before
+// the next test runs: a stale `dialog` handler answers prompts it never asked
+// about. Cookies and storage deliberately survive, matching iOS single-tab.
 async function resetSingleTab(page) {
+  for (const event of RESETTABLE_PAGE_EVENTS) {
+    try {
+      await page.removeAllListeners(event, { behavior: 'ignoreErrors' });
+    } catch {}
+  }
   if (page.url() === 'about:blank') return;
   try {
     await page.goto('about:blank', { timeout: SINGLE_TAB_RESET_TIMEOUT_MS });
@@ -306,15 +323,70 @@ async function resetSingleTab(page) {
   }
 }
 
-// A closed managed tab means Chrome died or the test closed it, so the cache is
-// dropped and the next test relaunches rather than driving a dead context.
-function liveSingleTabContext(connection) {
+// Context events a test may subscribe to. `page` and `close` are left alone
+// because Playwright's own machinery tracks contexts through them.
+const RESETTABLE_CONTEXT_EVENTS = [
+  'console', 'dialog', 'request', 'requestfailed', 'requestfinished',
+  'response', 'weberror',
+];
+
+// Runtime context state a test set outlives it on a reused context, so each
+// knob goes back to what the context was launched with rather than to a blank
+// default, which would drop project-level options. Cookies and storage stay:
+// persisting them across a worker is the point of the mode.
+async function resetSingleTabContext(context) {
+  const launched = singleTabLaunchOptions.get(context) || {};
+  for (const event of RESETTABLE_CONTEXT_EVENTS) {
+    try {
+      await context.removeAllListeners(event, { behavior: 'ignoreErrors' });
+    } catch {}
+  }
+  const steps = [
+    () => context.unrouteAll({ behavior: 'ignoreErrors' }),
+    async () => {
+      await context.clearPermissions();
+      const granted = launched.permissions;
+      if (Array.isArray(granted) && granted.length) await context.grantPermissions(granted);
+    },
+    () => context.setGeolocation(launched.geolocation || null),
+    () => context.setOffline(launched.offline === true),
+    () => context.setExtraHTTPHeaders(launched.extraHTTPHeaders || {}),
+  ];
+  for (const step of steps) {
+    try {
+      await step();
+    } catch {}
+  }
+}
+
+function launchSignature(options) {
+  try {
+    return JSON.stringify(options, Object.keys(options).sort());
+  } catch {
+    return null;
+  }
+}
+
+// Reuse needs the tab alive and the launch options unchanged: launchBrowser()
+// options such as httpCredentials are fixed at launch, so a test that asks for
+// different ones has to get its own Chrome rather than be silently ignored.
+function liveSingleTabContext(connection, signature) {
   const context = singleTabContexts.get(connection);
   if (!context) return null;
   const page = singleTabPages.get(context);
-  if (page && !page.isClosed()) return context;
+  if (page && !page.isClosed() && signature !== null && singleTabSignatures.get(context) === signature) {
+    return context;
+  }
+  if (page && !page.isClosed()) {
+    console.warn(
+      'android: single-tab cannot reuse the running Chrome for this test — its context options '
+      + 'differ from the launched ones; relaunching, so this test starts on a new tab',
+    );
+  }
   singleTabContexts.delete(connection);
   singleTabPages.delete(context);
+  singleTabSignatures.delete(context);
+  singleTabLaunchOptions.delete(context);
   return null;
 }
 
@@ -419,14 +491,25 @@ const driver = {
     // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
       const singleTab = isSingleTab(mode);
-      // launchBrowser() force-stops Chrome, so a single-tab run may only launch
-      // once per worker; every later test drives the context it already opened.
-      if (singleTab) {
-        const cached = liveSingleTabContext(connection);
-        if (cached) return cached;
-      }
       const pkg = caps.pkg || 'com.android.chrome';
       const pruneTabsEnabled = gateFlag(caps.closeTabAfterTest) !== false;
+      const launchOptions = {
+        ...forwardedUseOptions(useOptions),
+        ...buildLaunchBrowserOptions(caps),
+        ...extraContextOptions,
+      };
+      // Playwright gates locator.tap/touchscreen on hasTouch; a physical device always has touch.
+      launchOptions.hasTouch = gateFlag(launchOptions.hasTouch) ?? true;
+      // launchBrowser() force-stops Chrome, so a single-tab run may only launch
+      // once per worker; every later test drives the context it already opened.
+      const signature = singleTab ? launchSignature(launchOptions) : null;
+      if (singleTab) {
+        const cached = liveSingleTabContext(connection, signature);
+        if (cached) {
+          await resetSingleTabContext(cached);
+          return cached;
+        }
+      }
       await connection.shell(`am force-stop ${pkg}`);
       // Tabs Chrome restores without reloading have no CDP target, so a sweep can
       // never see them; wiping browser data is the only way to reclaim those.
@@ -437,13 +520,6 @@ const driver = {
           console.warn(`android: pm clear ${pkg} failed (${error.message}); keeping the existing profile`);
         }
       }
-      const launchOptions = {
-        ...forwardedUseOptions(useOptions),
-        ...buildLaunchBrowserOptions(caps),
-        ...extraContextOptions,
-      };
-      // Playwright gates locator.tap/touchscreen on hasTouch; a physical device always has touch.
-      launchOptions.hasTouch = gateFlag(launchOptions.hasTouch) ?? true;
       const context = await connection.launchBrowser(launchOptions);
       await applyRegisteredSelectors(context);
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));
@@ -459,11 +535,18 @@ const driver = {
       patchContextNewPage(context, ensureAndroidPrototypesPatched);
       if (singleTab) {
         const tab = managedPage || launchPage(context);
-        if (tab) {
+        if (!tab) {
+          console.warn(`android: no tab to adopt for mode '${mode}'; relaunching Chrome per test instead`);
+        } else if (signature === null) {
+          console.warn(
+            `android: context options for mode '${mode}' cannot be compared across tests; `
+            + 'relaunching Chrome per test instead',
+          );
+        } else {
           singleTabContexts.set(connection, context);
           singleTabPages.set(context, tab);
-        } else {
-          console.warn(`android: no tab to adopt for mode '${mode}'; relaunching Chrome per test instead`);
+          singleTabSignatures.set(context, signature);
+          singleTabLaunchOptions.set(context, launchOptions);
         }
       }
       if (pruneTabsEnabled) {

@@ -137,11 +137,25 @@ normal profile with a warning instead of failing.
 
 On Android, `public` and `private` force-stop and relaunch Chrome for every test,
 so each test starts on a fresh tab. A `single-tab-*` run instead launches Chrome
-once per worker and hands every test the same tab, reset to `about:blank` before
-the test body. Cookies and storage therefore persist across the tests in a
-worker, and `resetBrowserData` only applies at worker start. The bridge still
-opens a session per test, so per-test video and `sessionId` reporting is
-unchanged.
+once per worker and hands every test the same tab, reset to `about:blank` with
+the previous test's page listeners removed before the test body. Cookies and
+storage therefore persist across the tests in a worker, and `resetBrowserData`
+only applies at worker start. The bridge still opens a session per test, so
+per-test video and `sessionId` reporting is unchanged.
+
+Context options are fixed when Chrome launches, so a test that sets its own
+`extraContextOptions` — `httpCredentials` for basic auth, for example — gets a
+relaunched Chrome and a new tab, and warns once. Keep such options at project
+level to hold one tab for the whole worker.
+
+State a test sets on the context at runtime is undone before the next test:
+routes, permissions, geolocation, offline, and extra HTTP headers go back to the
+values the context was launched with, and page and context event listeners are
+dropped so a stale `dialog` or `console` handler cannot fire for a later test.
+Cookies and storage are deliberately kept — persisting them across a worker is
+the point of the mode. Init scripts added with `context.addInitScript` cannot be
+withdrawn (Playwright exposes no way to remove them), so they stay for the rest
+of the worker.
 
 `browsingMode: process.env.BROWSING_MODE || 'private'` needs no cast. The
 library accepts `public`, `private`, `single-tab-public`,

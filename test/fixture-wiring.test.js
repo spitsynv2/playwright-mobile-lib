@@ -201,7 +201,10 @@ class FakePage {
     this._closed = false;
     this._onClose = onClose;
     this.bridgeOps = [];
+    this.listenersRemoved = [];
   }
+
+  async removeAllListeners(event) { this.listenersRemoved.push(event); }
 
   url() { return this._url; }
 
@@ -231,7 +234,17 @@ function fakeContext(pages = []) {
   const context = {
     closeCalls: 0,
     pagesAtClose: null,
+    reset: [],
+    granted: null,
+    geolocation: 'unset',
     pages: () => all.filter((page) => !page.isClosed()),
+    async removeAllListeners(event) { context.reset.push(`off:${event}`); },
+    async unrouteAll() { context.reset.push('unrouteAll'); },
+    async clearPermissions() { context.reset.push('clearPermissions'); context.granted = null; },
+    async grantPermissions(permissions) { context.granted = permissions; },
+    async setGeolocation(value) { context.geolocation = value; },
+    async setOffline() { context.reset.push('setOffline'); },
+    async setExtraHTTPHeaders() { context.reset.push('setExtraHTTPHeaders'); },
     async newPage() {
       const page = new FakePage('about:blank');
       page._context = context;
@@ -297,10 +310,10 @@ test('Android hands the test the launch tab instead of opening a second one', as
 
 // One test of a single-tab worker: reuse the context, drive the managed tab,
 // then run the teardown the fixture would.
-async function runSingleTabTest(driver, connection, browsingMode) {
+async function runSingleTabTest(driver, connection, browsingMode, extraContextOptions = {}) {
   const context = await driver.createContext(connection, {
     preset: {},
-    extraContextOptions: {},
+    extraContextOptions,
     capabilities: { platformName: 'Android', browsingMode },
   });
   const page = await driver.createPage(context, {});
@@ -337,6 +350,69 @@ test('Android single-tab brackets each test with its own bridge session', async 
     launched.bridgeOps.filter((op) => op !== 'getDeviceInfo'),
     ['startSession', 'endSession', 'startSession', 'endSession'],
   );
+});
+
+test('Android single-tab relaunches when a test asks for different context options', async () => {
+  const context = fakeContext([new FakePage('about:blank')]);
+  const connection = fakeAndroidDevice(context);
+  const driver = selectDriver('Android');
+  const credentials = { httpCredentials: { username: 'admin', password: 'admin' } };
+
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+  await runSingleTabTest(driver, connection, 'single-tab-public', credentials);
+
+  assert.equal(connection.calls.launches, 2, 'launchBrowser-only options cannot be applied to a running Chrome');
+  assert.deepEqual(
+    connection.calls.launchOptions.httpCredentials,
+    credentials.httpCredentials,
+    'the relaunch carries the credentials the test asked for',
+  );
+});
+
+test('Android single-tab drops the listeners a previous test left on the tab', async () => {
+  const launched = new FakePage('about:blank');
+  const connection = fakeAndroidDevice(fakeContext([launched]));
+  const driver = selectDriver('Android');
+
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+  launched.listenersRemoved = [];
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+
+  assert.ok(launched.listenersRemoved.includes('dialog'), 'a stale dialog handler cannot answer this test\'s prompts');
+  assert.ok(launched.listenersRemoved.includes('console'), 'console listeners do not accumulate across tests');
+  assert.ok(!launched.listenersRemoved.includes('close'), 'Playwright keeps tracking page lifecycle');
+});
+
+test('Android single-tab undoes the context state a previous test set', async () => {
+  const context = fakeContext([new FakePage('about:blank')]);
+  const connection = fakeAndroidDevice(context);
+  const driver = selectDriver('Android');
+
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+  await context.setGeolocation({ latitude: 89.23, longitude: 89.01 });
+  await context.grantPermissions(['geolocation']);
+  context.reset = [];
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+
+  assert.equal(context.geolocation, null, 'coordinates do not leak into the next test');
+  assert.equal(context.granted, null, 'permissions do not leak into the next test');
+  assert.ok(context.reset.includes('unrouteAll'), 'routes do not leak into the next test');
+  assert.ok(context.reset.includes('off:dialog'), 'context dialog handlers are dropped too');
+});
+
+test('Android single-tab restores the options the context was launched with', async () => {
+  const context = fakeContext([new FakePage('about:blank')]);
+  const connection = fakeAndroidDevice(context);
+  const driver = selectDriver('Android');
+  const launched = { permissions: ['clipboard-read'], geolocation: { latitude: 1, longitude: 2 } };
+
+  await runSingleTabTest(driver, connection, 'single-tab-public', launched);
+  await context.setGeolocation({ latitude: 50, longitude: 50 });
+  await runSingleTabTest(driver, connection, 'single-tab-public', launched);
+
+  assert.equal(connection.calls.launches, 1, 'stable options still hold one Chrome for the worker');
+  assert.deepEqual(context.granted, ['clipboard-read'], 'a launch-time grant survives the reset');
+  assert.deepEqual(context.geolocation, launched.geolocation, 'the reset restores launch coordinates, not null');
 });
 
 test('Android single-tab resets the reused tab before the next test runs', async () => {
