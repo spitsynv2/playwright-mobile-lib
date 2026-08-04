@@ -127,7 +127,7 @@ function fakeAndroidDevice(context = { pages: () => [] }) {
     async launchBrowser(options) {
       calls.launchOptions = options;
       calls.launches += 1;
-      return context;
+      return typeof context === 'function' ? context() : context;
     },
   };
 }
@@ -202,9 +202,22 @@ class FakePage {
     this._onClose = onClose;
     this.bridgeOps = [];
     this.listenersRemoved = [];
+    this._listeners = new Map();
   }
 
-  async removeAllListeners(event) { this.listenersRemoved.push(event); }
+  on(event, listener) {
+    if (!this._listeners.has(event)) this._listeners.set(event, []);
+    this._listeners.get(event).push(listener);
+    return this;
+  }
+
+  listeners(event) { return [...(this._listeners.get(event) || [])]; }
+
+  off(event, listener) {
+    this.listenersRemoved.push(event);
+    this._listeners.set(event, this.listeners(event).filter((entry) => entry !== listener));
+    return this;
+  }
 
   url() { return this._url; }
 
@@ -237,8 +250,30 @@ function fakeContext(pages = []) {
     reset: [],
     granted: null,
     geolocation: 'unset',
+    _options: {},
+    _channel: {
+      registeredEngines: [],
+      async registerSelectorEngine({ selectorEngine }) {
+        const seen = context._channel.registeredEngines;
+        if (seen.includes(selectorEngine.name)) {
+          throw new Error(`"${selectorEngine.name}" selector engine has been already registered`);
+        }
+        seen.push(selectorEngine.name);
+      },
+    },
     pages: () => all.filter((page) => !page.isClosed()),
-    async removeAllListeners(event) { context.reset.push(`off:${event}`); },
+    _listeners: new Map(),
+    on(event, listener) {
+      if (!context._listeners.has(event)) context._listeners.set(event, []);
+      context._listeners.get(event).push(listener);
+      return context;
+    },
+    listeners: (event) => [...(context._listeners.get(event) || [])],
+    off(event, listener) {
+      context.reset.push(`off:${event}`);
+      context._listeners.set(event, context.listeners(event).filter((entry) => entry !== listener));
+      return context;
+    },
     async unrouteAll() { context.reset.push('unrouteAll'); },
     async clearPermissions() { context.reset.push('clearPermissions'); context.granted = null; },
     async grantPermissions(permissions) { context.granted = permissions; },
@@ -375,12 +410,57 @@ test('Android single-tab drops the listeners a previous test left on the tab', a
   const driver = selectDriver('Android');
 
   await runSingleTabTest(driver, connection, 'single-tab-public');
+  for (const event of ['dialog', 'console', 'close']) launched.on(event, () => {});
   launched.listenersRemoved = [];
   await runSingleTabTest(driver, connection, 'single-tab-public');
 
   assert.ok(launched.listenersRemoved.includes('dialog'), 'a stale dialog handler cannot answer this test\'s prompts');
   assert.ok(launched.listenersRemoved.includes('console'), 'console listeners do not accumulate across tests');
   assert.ok(!launched.listenersRemoved.includes('close'), 'Playwright keeps tracking page lifecycle');
+  assert.deepEqual(launched.listeners('dialog'), [], 'removal goes through off(), which also unsubscribes the server');
+});
+
+test('Android single-tab relaunches when the reused tab will not navigate', async () => {
+  const wedged = new FakePage('https://example.com/');
+  const fresh = new FakePage('about:blank');
+  const contexts = [fakeContext([wedged]), fakeContext([fresh])];
+  const connection = fakeAndroidDevice(() => contexts.shift());
+  const driver = selectDriver('Android');
+
+  await runSingleTabTest(driver, connection, 'single-tab-public');
+  // A dialog the previous test left open blocks the renderer, so goto() hangs.
+  wedged.goto = async () => { throw new Error('Timeout 10000ms exceeded'); };
+  const { page } = await runSingleTabTest(driver, connection, 'single-tab-public');
+
+  assert.equal(connection.calls.launches, 2, 'a wedged tab does not get handed to the next test');
+  assert.equal(page, fresh, 'the next test runs on the relaunched tab');
+});
+
+test('Android single-tab picks up a selector engine a later spec registered', async () => {
+  const { selectors } = require('@playwright/test');
+  const engines = selectors._selectorEngines;
+  const restore = [...engines];
+  const context = fakeContext([new FakePage('about:blank')]);
+  const connection = fakeAndroidDevice(context);
+  const driver = selectDriver('Android');
+
+  try {
+    engines.length = 0;
+    await runSingleTabTest(driver, connection, 'single-tab-public');
+    // Stands in for a beforeAll that runs after the worker already launched Chrome.
+    engines.push({ name: 'qa', source: '() => {}', contentScript: false });
+    await runSingleTabTest(driver, connection, 'single-tab-public');
+    await runSingleTabTest(driver, connection, 'single-tab-public');
+
+    assert.deepEqual(
+      context._channel.registeredEngines,
+      ['qa'],
+      'the reused context gets the engine once, not on every later test',
+    );
+  } finally {
+    engines.length = 0;
+    engines.push(...restore);
+  }
 });
 
 test('Android single-tab undoes the context state a previous test set', async () => {
@@ -391,6 +471,7 @@ test('Android single-tab undoes the context state a previous test set', async ()
   await runSingleTabTest(driver, connection, 'single-tab-public');
   await context.setGeolocation({ latitude: 89.23, longitude: 89.01 });
   await context.grantPermissions(['geolocation']);
+  context.on('dialog', () => {});
   context.reset = [];
   await runSingleTabTest(driver, connection, 'single-tab-public');
 

@@ -190,13 +190,26 @@ function forwardedUseOptions(useOptions) {
 
 const NO_TIMEOUT = { signal: undefined, timeout: 0 };
 
+// Engine names already registered on a context; a second registration of the
+// same name throws, and a reused context is replayed once per test.
+const contextSelectorEngines = new WeakMap();
+
 // launchBrowser() skips the selector plumbing newContext() gets, so anything
-// registered before the device context existed has to be replayed onto it.
+// registered before the device context existed has to be replayed onto it. A
+// single-tab context also outlives the beforeAll hooks of later specs, so this
+// runs on reuse too and picks up whatever they registered since.
 async function applyRegisteredSelectors(context) {
   const channel = context._channel;
   if (!channel || typeof channel.registerSelectorEngine !== 'function') return;
+  let applied = contextSelectorEngines.get(context);
+  if (!applied) {
+    applied = new Set();
+    contextSelectorEngines.set(context, applied);
+  }
   for (const selectorEngine of selectors._selectorEngines || []) {
+    if (applied.has(selectorEngine.name)) continue;
     await channel.registerSelectorEngine({ selectorEngine }, NO_TIMEOUT);
+    applied.add(selectorEngine.name);
   }
   const testIdAttributeName = selectors._testIdAttributeName;
   if (!testIdAttributeName || typeof channel.setTestIdAttributeName !== 'function') return;
@@ -306,20 +319,37 @@ const RESETTABLE_PAGE_EVENTS = [
   'websocket', 'worker',
 ];
 
+// Playwright unsubscribes a server-side event only from off()/removeListener();
+// removeAllListeners() empties the emitter without it, leaving the server sure
+// the client still listens, which strands the dialogs it forwards.
+function dropListeners(target, events) {
+  for (const event of events) {
+    let listeners = [];
+    try {
+      listeners = target.listeners(event) || [];
+    } catch {
+      continue;
+    }
+    for (const listener of listeners) {
+      try {
+        target.off(event, listener);
+      } catch {}
+    }
+  }
+}
+
 // The tab outlives the test that configured it, so listeners have to go before
 // the next test runs: a stale `dialog` handler answers prompts it never asked
 // about. Cookies and storage deliberately survive, matching iOS single-tab.
 async function resetSingleTab(page) {
-  for (const event of RESETTABLE_PAGE_EVENTS) {
-    try {
-      await page.removeAllListeners(event, { behavior: 'ignoreErrors' });
-    } catch {}
-  }
-  if (page.url() === 'about:blank') return;
+  dropListeners(page, RESETTABLE_PAGE_EVENTS);
+  if (page.url() === 'about:blank') return true;
   try {
     await page.goto('about:blank', { timeout: SINGLE_TAB_RESET_TIMEOUT_MS });
+    return true;
   } catch (error) {
     console.warn(`android: single-tab reset to about:blank failed (${error.message})`);
+    return false;
   }
 }
 
@@ -336,11 +366,7 @@ const RESETTABLE_CONTEXT_EVENTS = [
 // persisting them across a worker is the point of the mode.
 async function resetSingleTabContext(context) {
   const launched = singleTabLaunchOptions.get(context) || {};
-  for (const event of RESETTABLE_CONTEXT_EVENTS) {
-    try {
-      await context.removeAllListeners(event, { behavior: 'ignoreErrors' });
-    } catch {}
-  }
+  dropListeners(context, RESETTABLE_CONTEXT_EVENTS);
   const steps = [
     () => context.unrouteAll({ behavior: 'ignoreErrors' }),
     async () => {
@@ -383,11 +409,24 @@ function liveSingleTabContext(connection, signature) {
       + 'differ from the launched ones; relaunching, so this test starts on a new tab',
     );
   }
+  forgetSingleTab(connection, context);
+  return null;
+}
+
+function forgetSingleTab(connection, context) {
   singleTabContexts.delete(connection);
   singleTabPages.delete(context);
   singleTabSignatures.delete(context);
   singleTabLaunchOptions.delete(context);
-  return null;
+}
+
+// Returns false when the tab cannot be handed to another test — a dialog the
+// previous test left open blocks the renderer, so every later navigation hangs.
+async function recycleSingleTabContext(context) {
+  await applyRegisteredSelectors(context);
+  await resetSingleTabContext(context);
+  const page = singleTabPages.get(context);
+  return page ? resetSingleTab(page) : false;
 }
 
 const SCREENSHOT_TIMEOUT_MS = 10_000;
@@ -506,8 +545,15 @@ const driver = {
       if (singleTab) {
         const cached = liveSingleTabContext(connection, signature);
         if (cached) {
-          await resetSingleTabContext(cached);
-          return cached;
+          if (await recycleSingleTabContext(cached)) return cached;
+          console.warn(
+            'android: single-tab could not hand the reused tab to this test — the previous test '
+            + 'may have left a dialog open; relaunching Chrome',
+          );
+          forgetSingleTab(connection, cached);
+          try {
+            await cached.close();
+          } catch {}
         }
       }
       await connection.shell(`am force-stop ${pkg}`);
@@ -589,10 +635,9 @@ const driver = {
     // evaluate throws and is swallowed, leaving sessionId empty.
     let sessionId = '';
     let resolvedDeviceInfo = deviceInfo || { platformName: 'Android' };
-    // A reused tab still holds the previous test's document, and its marker only
-    // opens here, so both must happen before the body runs.
+    // The reused tab was reset when the context was handed over; its session
+    // marker opens here, before the body runs.
     if (managed) {
-      await resetSingleTab(managed);
       try {
         sessionId = await page.bridge.startSession();
       } catch (error) {
