@@ -20,7 +20,7 @@
   },
   "scripts": {
     "build": "esbuild index.js --bundle --platform=node --target=node22 --format=cjs --minify --legal-comments=none --packages=external --outfile=dist/index.js",
-    "prepare": "npm run build",
+    "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "npm run build && npm run typecheck && node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && node test/screenshot-gate.test.js && node --test test/telemetry.test.js test/reporting.test.js test/capabilities.test.js test/device-name.test.js test/use-guard.test.js test/fixture-wiring.test.js test/bundle.test.js"
   },
