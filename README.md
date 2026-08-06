@@ -382,7 +382,7 @@ const { test, expect } = require('playwright-mobile-lib');
 
 | Variable | Purpose |
 | --- | --- |
-| `PWM_ORCHESTRATOR` | Orchestrator base URL. The per-platform route is derived from it. Leave unset for local runs. |
+| `PWM_ORCHESTRATOR` | Orchestrator base URL, e.g. `wss://orch.example.com:7465`. The per-platform route is derived from it. May carry `user:pass@` userinfo. Leave unset for local runs. |
 | `IOS_WS_ENDPOINT` | Full iOS WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for iOS. |
 | `ANDROID_WS_ENDPOINT` | Full Android WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for Android. |
 | `PWM_IOS_WS_PATH` | iOS route appended to `PWM_ORCHESTRATOR`. Defaults to `/safari`. |
@@ -401,11 +401,24 @@ const { test, expect } = require('playwright-mobile-lib');
 | `ANDROID_OMIT_DRIVER_INSTALL` | Set exactly to `true` to skip Playwright's Android driver installation in direct-ADB mode. |
 | `REPORTING_ENABLED` | Set exactly to `true` to enable the optional Zebrunner integration. Defaults to disabled. |
 
-Authentication is intended for an orchestrator behind an auth proxy. The
-`Authorization` value is sent as a Playwright connect header on both platforms;
-credentials are never put in the endpoint URL. Precedence is `PWM_AUTH_HEADER`,
-then `PWM_AUTH_TOKEN` as `Bearer <token>`, then `PWM_AUTH_USER` /
-`PWM_AUTH_PASSWORD` as HTTP Basic.
+Authentication is intended for an orchestrator behind an auth proxy, such as the
+TLS + basic-auth nginx sidecar shipped with `playwright-mobile-orchestrator`.
+The `Authorization` value is sent as a Playwright connect header on both
+platforms; credentials never reach the endpoint URL Playwright connects to.
+Precedence is `PWM_AUTH_HEADER`, then `PWM_AUTH_TOKEN` as `Bearer <token>`, then
+`PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` as HTTP Basic, then userinfo in the
+endpoint URL.
+
+Userinfo is the shorthand form of the same Basic credentials:
+
+```bash
+PWM_ORCHESTRATOR=wss://alice:secret@orch.example.com:7465
+```
+
+The library strips `alice:secret@` before connecting and sends it as
+`Authorization: Basic …`. Percent-encode reserved characters in the password
+(`@` as `%40`, `:` as `%3A`); prefer `PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` when
+the password is awkward to encode or the URL would end up in shell history.
 
 ## Extending `test` (fixtures, page objects, TypeScript)
 

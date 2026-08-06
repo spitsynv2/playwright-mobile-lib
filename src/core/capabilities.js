@@ -39,19 +39,51 @@ function platformKey(platform) {
   return String(platform || '').toLowerCase() === 'android' ? 'android' : 'ios';
 }
 
-// Resolve the orchestrator WS endpoint for a platform. Explicit per-platform env
+// Endpoint as configured, userinfo included. Explicit per-platform env
 // (IOS_WS_ENDPOINT / ANDROID_WS_ENDPOINT) wins for back-compat and direct-server
 // runs; otherwise it is derived from a single PWM_ORCHESTRATOR base + platform
 // path. Empty string means "no farm" (local webkit.launch / ADB devices).
 // Capabilities ride the connect header, so any legacy ?query on the endpoint is
 // stripped; the orchestrator pool-matches on the header instead.
-function resolveWsEndpoint(platform) {
+function rawWsEndpoint(platform) {
   const key = platformKey(platform);
   const explicit = key === 'android' ? process.env.ANDROID_WS_ENDPOINT : process.env.IOS_WS_ENDPOINT;
   if (explicit) return explicit.split('?')[0];
   const base = (process.env.PWM_ORCHESTRATOR || '').replace(/\/+$/, '');
   if (!base) return '';
   return `${base}${WS_PATHS[key]}`.split('?')[0];
+}
+
+function decodeUserinfo(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+// Userinfo in the endpoint (wss://user:pass@host) is a convenience form for an
+// orchestrator behind a basic-auth proxy; it becomes an Authorization header and
+// must never reach Playwright's connect URL.
+function splitEndpointCredentials(endpoint) {
+  const empty = { endpoint: endpoint || '', username: '', password: '' };
+  if (!endpoint) return empty;
+  let parsed;
+  try {
+    parsed = new URL(endpoint);
+  } catch {
+    return empty;
+  }
+  if (!parsed.username && !parsed.password) return empty;
+  const username = decodeUserinfo(parsed.username);
+  const password = decodeUserinfo(parsed.password);
+  parsed.username = '';
+  parsed.password = '';
+  return { endpoint: parsed.toString(), username, password };
+}
+
+function resolveWsEndpoint(platform) {
+  return splitEndpointCredentials(rawWsEndpoint(platform)).endpoint;
 }
 
 // Default for runs that omit per-project capabilities. Real device/farm runs must
@@ -91,9 +123,14 @@ function gateFlag(value) {
   return undefined;
 }
 
+function basicAuthHeader(user, password) {
+  return `Basic ${Buffer.from(`${user || ''}:${password || ''}`).toString('base64')}`;
+}
+
 // Optional Authorization for an orchestrator behind an auth proxy. Precedence:
-// a raw header override, then a bearer token, then basic user/password.
-function buildAuthHeader() {
+// a raw header override, then a bearer token, then basic user/password, then
+// userinfo carried by the endpoint URL.
+function buildAuthHeader(platform) {
   const explicit = (process.env.PWM_AUTH_HEADER || '').trim();
   if (explicit) return explicit;
   const token = (process.env.PWM_AUTH_TOKEN || '').trim();
@@ -101,17 +138,21 @@ function buildAuthHeader() {
   const user = process.env.PWM_AUTH_USER;
   const password = process.env.PWM_AUTH_PASSWORD;
   if (user || password) {
-    return `Basic ${Buffer.from(`${user || ''}:${password || ''}`).toString('base64')}`;
+    return basicAuthHeader(user, password);
+  }
+  const fromUrl = splitEndpointCredentials(rawWsEndpoint(platform));
+  if (fromUrl.username || fromUrl.password) {
+    return basicAuthHeader(fromUrl.username, fromUrl.password);
   }
   return '';
 }
 
 // Orchestrator connect headers: capabilities JSON for pool-matching, the stable
 // client id for device-pinning across a reconnect, and optional Authorization.
-function buildConnectHeaders(capabilities, id = clientId) {
+function buildConnectHeaders(capabilities, platform, id = clientId) {
   const headers = { 'x-pwm-capabilities': JSON.stringify(effectiveCapabilities(capabilities)) };
   if (id) headers['x-pwm-client-id'] = id;
-  const authorization = buildAuthHeader();
+  const authorization = buildAuthHeader(platform);
   if (authorization) headers['Authorization'] = authorization;
   return headers;
 }

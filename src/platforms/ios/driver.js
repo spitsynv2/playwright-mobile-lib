@@ -41,7 +41,7 @@ const driver = {
     return webkit.connect(wsEndpoint, {
       timeout: connectTimeoutMs,
       slowMo: slowMoMs,
-      headers: buildConnectHeaders(caps),
+      headers: buildConnectHeaders(caps, 'iOS'),
     });
   },
 

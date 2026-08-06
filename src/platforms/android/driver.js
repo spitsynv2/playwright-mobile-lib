@@ -336,7 +336,7 @@ const driver = {
       return android.connect(wsEndpoint, {
         timeout: connectTimeoutMs,
         slowMo: slowMoMs,
-        headers: buildConnectHeaders(caps),
+        headers: buildConnectHeaders(caps, 'Android'),
       });
     }
     if (useAdb(caps)) {
