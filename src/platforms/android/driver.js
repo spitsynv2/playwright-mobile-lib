@@ -355,10 +355,16 @@ const driver = {
 
   resolveDeviceInfo(capabilities) {
     const caps = effectiveCapabilities(capabilities);
+    if (resolveWsEndpoint('Android') && !caps.deviceName) {
+      throw new Error(
+        'capabilities.deviceName is required for Android device runs — '
+        + 'set it in the project capabilities (playwright.config.js).',
+      );
+    }
     return {
       deviceName: caps.deviceName || '',
       platformName: caps.platformName || 'Android',
-      osVersion: caps.osVersion || '',
+      osVersion: '',
     };
   },
 

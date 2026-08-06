@@ -146,8 +146,6 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   deviceUuid?: string;
   /** Android device serial for direct-ADB selection (or set `ANDROID_SERIAL`). */
   serial?: string;
-  /** OS version pool-match filter. */
-  osVersion?: string;
   /**
    * Tab/browsing mode. Full parity on iOS; documented subset on Android.
    * Defaults to `private` on both.

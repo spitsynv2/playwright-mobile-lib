@@ -34,7 +34,6 @@ test('browser is the platform connection', async ({ browser }) => {
 const androidCapabilities: Capabilities = {
   platformName: 'Android',
   deviceName: 'Pixel 7',
-  osVersion: '14',
   serial: 'emulator-5554',
   browsingMode: 'single-tab-public',
   closeTabAfterTest: true,
@@ -73,7 +72,6 @@ const iosCapabilities: Capabilities = {
   platformName: 'iOS',
   deviceName: 'iPhone 16 Plus',
   deviceUuid: 'udid',
-  osVersion: '26.4',
   browsingMode: 'single-tab-private',
   skipSafariCleanup: true,
   closeTabAfterTest: false,

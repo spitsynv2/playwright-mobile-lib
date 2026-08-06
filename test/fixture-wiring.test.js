@@ -42,9 +42,8 @@ test('iOS farm runs accept deviceName, deviceUuid, or both', () => {
         platformName: 'iOS',
         deviceName: 'iPhone XR',
         deviceUuid: '00008020-UDID',
-        osVersion: '18.0',
       }),
-      { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '18.0' },
+      { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
     );
     assert.throws(
       () => driver.resolveDeviceInfo({ platformName: 'iOS' }),
@@ -59,6 +58,20 @@ test('iOS local runs do not require a device identity', () => {
     assert.deepEqual(
       driver.resolveDeviceInfo({ platformName: 'iOS' }),
       { deviceName: '', platformName: 'iOS', osVersion: '' },
+    );
+  });
+});
+
+test('Android farm runs require deviceName', () => {
+  const driver = selectDriver('Android');
+  withEnv({ PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' }, () => {
+    assert.deepEqual(
+      driver.resolveDeviceInfo({ platformName: 'Android', deviceName: 'Pixel 3 XL' }),
+      { deviceName: 'Pixel 3 XL', platformName: 'Android', osVersion: '' },
+    );
+    assert.throws(
+      () => driver.resolveDeviceInfo({ platformName: 'Android' }),
+      /deviceName is required/,
     );
   });
 });

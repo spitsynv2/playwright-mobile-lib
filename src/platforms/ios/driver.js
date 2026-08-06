@@ -68,7 +68,7 @@ const driver = {
     return {
       deviceName: caps.deviceName || '',
       platformName: caps.platformName || 'iOS',
-      osVersion: caps.osVersion || '',
+      osVersion: '',
     };
   },
 

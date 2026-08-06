@@ -77,7 +77,7 @@ function resolveWsEndpoint(platform) {
 }
 
 // Default for runs that omit per-project capabilities. Real device/farm runs must
-// declare platformName (plus deviceName and any osVersion / browsingMode /
+// declare platformName (plus deviceName / deviceUuid / browsingMode /
 // logLevels) in `use: { capabilities }`.
 const defaultCapabilities = { platformName: 'iOS' };
 

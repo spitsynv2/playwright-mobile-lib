@@ -14,7 +14,7 @@ const test = base.extend({
 
   // Desired capabilities for this project/run. The orchestrator pool-matches a
   // free device against these. platformName selects the driver ('iOS' | 'Android')
-  // and route; deviceName/osVersion/browsingMode are optional filters. Set
+  // and route; deviceName/deviceUuid/browsingMode pin the farm device. Set
   // per-project via `use: { capabilities }`.
   capabilities: [defaultCapabilities, { option: true, scope: 'worker' }],
 
