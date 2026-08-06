@@ -1,5 +1,5 @@
 // Android Chrome platform driver. With a farm endpoint it connects to the
-// orchestrator (/playwright); with an explicit ADB serial it drives a connected
+// orchestrator session URL; with an explicit ADB serial it drives a connected
 // device; otherwise it launches a local Chromium with the caps device preset
 // (viewport emulation) for local pre-flight validation.
 const { _android: android } = require('playwright');
@@ -13,6 +13,7 @@ const {
   connectTimeoutMs,
   slowMoMs,
 } = require('../../core/capabilities');
+const { findByNormalizedDeviceName } = require('../../core/device-name');
 const { defineThrowing } = require('../../core/unsupported');
 const { patchContextNewPage, patchContextClose } = require('../../core/context-patch');
 const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
@@ -228,11 +229,11 @@ function buildLaunchBrowserOptions(caps) {
 }
 
 // Playwright device preset for local Chromium emulation, resolved from the caps
-// device name (underscores tolerated). Falls back to a mobile default so a local
-// run always emulates a phone viewport.
+// device name (spaces, underscores, hyphens, and case are interchangeable).
+// Falls back to a mobile default so a local run always emulates a phone viewport.
 function resolveAndroidDevicePreset(deviceName) {
-  const requested = String(deviceName || '').replace(/_/g, ' ').trim();
-  if (requested && devices[requested]) return devices[requested];
+  const match = findByNormalizedDeviceName(devices, deviceName);
+  if (match) return match;
   return devices[DEFAULT_LOCAL_ANDROID_DEVICE] || {};
 }
 

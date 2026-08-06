@@ -140,9 +140,9 @@ type AndroidLaunchCapabilities = Pick<
 export interface Capabilities extends AndroidLaunchCapabilities {
   /** Selects the platform driver and orchestrator route. Required. */
   platformName: 'iOS' | 'Android';
-  /** Device pool-match filter (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Required for iOS farm runs. */
+  /** Device pool-match filter (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Spaces/underscores/hyphens/case are interchangeable. For iOS farm runs, provide this and/or `deviceUuid`. */
   deviceName?: IOSDeviceName;
-  /** iOS device UDID pool-match filter. */
+  /** iOS device UDID pool-match filter. For iOS farm runs, provide this and/or `deviceName`. */
   deviceUuid?: string;
   /** Android device serial for direct-ADB selection (or set `ANDROID_SERIAL`). */
   serial?: string;

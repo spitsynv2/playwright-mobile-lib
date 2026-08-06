@@ -98,17 +98,17 @@ viewport.
 To run against real devices, point the run at an orchestrator:
 
 ```bash
-PWM_ORCHESTRATOR=ws://orchestrator.example.com:7777 \
+PWM_ORCHESTRATOR=wss://orchestrator.example.com:7465/sessions \
   npx playwright test --project=ios-safari
 
-PWM_ORCHESTRATOR=ws://orchestrator.example.com:7777 \
+PWM_ORCHESTRATOR=wss://orchestrator.example.com:7465/sessions \
   npx playwright test --project=android-chrome
 ```
 
-The library derives the per-platform route from that base URL. A full
-`IOS_WS_ENDPOINT` or `ANDROID_WS_ENDPOINT` overrides the derived URL for that
-platform. Capabilities are sent as a connect header and the orchestrator
-pool-matches a free device against them.
+Both projects use the same session URL. Platform comes from
+`capabilities.platformName`. A full `IOS_WS_ENDPOINT` or `ANDROID_WS_ENDPOINT`
+overrides the URL for that platform. Capabilities are sent as a connect header
+and the orchestrator pool-matches a free device against them.
 
 ## Capabilities
 
@@ -118,8 +118,8 @@ no environment-variable fallbacks for device capabilities.
 | Capability | Type | Meaning |
 | --- | --- | --- |
 | `platformName` | `'iOS' \| 'Android'` | Required. Selects the platform driver and route. |
-| `deviceName` | `string` | Device pool-match filter, such as `iPhone 16 Plus` or `Pixel 7`. Required for iOS device runs; also selects the local emulation preset. |
-| `deviceUuid` | `string` | iOS device UDID pool-match filter. |
+| `deviceName` | `string` | Device pool-match filter, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). For iOS farm runs, provide `deviceName` and/or `deviceUuid`. Also selects the local emulation preset when set. |
+| `deviceUuid` | `string` | iOS device UDID pool-match filter. Alone is enough for an iOS farm run; with `deviceName` both must resolve to the same device. |
 | `osVersion` | `string` | OS-version pool-match filter. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
@@ -382,11 +382,9 @@ const { test, expect } = require('playwright-mobile-lib');
 
 | Variable | Purpose |
 | --- | --- |
-| `PWM_ORCHESTRATOR` | Orchestrator base URL, e.g. `wss://orch.example.com:7465`. The per-platform route is derived from it. May carry `user:pass@` userinfo. Leave unset for local runs. |
+| `PWM_ORCHESTRATOR` | Full session WebSocket URL, e.g. `wss://orch.example.com:7465/sessions`. Platform comes from `capabilities.platformName`. May carry `user:pass@` userinfo. Leave unset for local runs. |
 | `IOS_WS_ENDPOINT` | Full iOS WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for iOS. |
 | `ANDROID_WS_ENDPOINT` | Full Android WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for Android. |
-| `PWM_IOS_WS_PATH` | iOS route appended to `PWM_ORCHESTRATOR`. Defaults to `/safari`. |
-| `PWM_ANDROID_WS_PATH` | Android route appended to `PWM_ORCHESTRATOR`. Defaults to `/playwright`. |
 | `PWM_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. Defaults to `120000`; the connection fixture timeout is this value plus 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
 | `PWM_CLIENT_ID` | Stable `x-pwm-client-id` used for device pinning across reconnects. When absent, a unique ID is generated once per worker process. The legacy `IOS_CLIENT_ID` is still accepted. |
 | `PWM_TAB_CLOSE_TIMEOUT_MS` | Android: how long a single tab close may take during a sweep before the run moves on. Defaults to `5000`. |
@@ -412,7 +410,7 @@ endpoint URL.
 Userinfo is the shorthand form of the same Basic credentials:
 
 ```bash
-PWM_ORCHESTRATOR=wss://alice:secret@orch.example.com:7465
+PWM_ORCHESTRATOR=wss://alice:secret@orch.example.com:7465/sessions
 ```
 
 The library strips `alice:secret@` before connecting and sends it as

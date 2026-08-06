@@ -31,6 +31,11 @@ const CUSTOM_DEVICE_DEFINITIONS = {
   },
 };
 
+const {
+  normalizeDeviceName,
+  findByNormalizedDeviceName,
+} = require('../../core/device-name');
+
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -70,10 +75,6 @@ function buildCustomDevices(playwrightDevices) {
   return customDevices;
 }
 
-function normalizeDeviceName(deviceName) {
-  return String(deviceName || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
 function getIOSDeviceCatalog(playwrightDevices) {
   return {
     ...playwrightDevices,
@@ -81,18 +82,32 @@ function getIOSDeviceCatalog(playwrightDevices) {
   };
 }
 
+function resolveCatalogKey(catalog, deviceName) {
+  const normalized = normalizeDeviceName(deviceName);
+  if (!normalized) return '';
+  if (DEVICE_ALIASES[normalized]) return DEVICE_ALIASES[normalized];
+  for (const name of Object.keys(catalog)) {
+    if (normalizeDeviceName(name) === normalized) return name;
+  }
+  return String(deviceName || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function resolveDeviceCanonicalName(deviceName) {
-  const normalizedName = normalizeDeviceName(deviceName);
-  return DEVICE_ALIASES[normalizedName] || String(deviceName || '').replace(/_/g, ' ');
+  return resolveCatalogKey({ ...CUSTOM_DEVICE_DEFINITIONS, ...DEVICE_IOS_VERSIONS }, deviceName);
 }
 
 function resolveIOSDevicePreset(deviceName, playwrightDevices) {
   const catalog = getIOSDeviceCatalog(playwrightDevices);
-  return catalog[resolveDeviceCanonicalName(deviceName)] || null;
+  const alias = DEVICE_ALIASES[normalizeDeviceName(deviceName)];
+  if (alias && catalog[alias]) return catalog[alias];
+  return findByNormalizedDeviceName(catalog, deviceName) || null;
 }
 
 function resolveIOSVersion(deviceName) {
-  return DEVICE_IOS_VERSIONS[resolveDeviceCanonicalName(deviceName)] || null;
+  const key = resolveDeviceCanonicalName(deviceName);
+  return DEVICE_IOS_VERSIONS[key]
+    || findByNormalizedDeviceName(DEVICE_IOS_VERSIONS, deviceName)
+    || null;
 }
 
 module.exports = {

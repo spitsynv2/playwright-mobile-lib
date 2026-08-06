@@ -1,6 +1,6 @@
-// iOS Safari platform driver: connects WebKit to the orchestrator (/safari) or
-// launches locally, creates the context/page, and wires the bridge/appium/
-// unsupported prototypes + Zebrunner session handshake.
+// iOS Safari platform driver: connects WebKit to the orchestrator session
+// endpoint, or launches locally, creates the context/page, and wires the
+// bridge/appium/unsupported prototypes + Zebrunner session handshake.
 const { webkit, devices } = require('@playwright/test');
 
 const { resolveIOSDevicePreset } = require('./custom-devices');
@@ -55,14 +55,14 @@ const driver = {
   },
 
   // Requested device metadata used until the bridge reports the selected device.
-  // deviceName is required for farm runs (pool-matching + reporting); a local
-  // webkit.launch run has no device pool, so it is optional there.
+  // Farm runs need a pool filter: deviceName and/or deviceUuid. A local
+  // webkit.launch run has no device pool, so both are optional there.
   resolveDeviceInfo(capabilities) {
     const caps = effectiveCapabilities(capabilities);
-    if (resolveWsEndpoint('iOS') && !caps.deviceName) {
+    if (resolveWsEndpoint('iOS') && !caps.deviceName && !caps.deviceUuid) {
       throw new Error(
-        'capabilities.deviceName is required for device runs — set it in the project '
-        + 'capabilities (playwright.config.js).',
+        'capabilities.deviceName or capabilities.deviceUuid is required for device runs — '
+        + 'set one (or both) in the project capabilities (playwright.config.js).',
       );
     }
     return {

@@ -26,6 +26,43 @@ function withEnv(vars, fn) {
   }
 }
 
+test('iOS farm runs accept deviceName, deviceUuid, or both', () => {
+  const driver = selectDriver('iOS');
+  withEnv({ PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' }, () => {
+    assert.deepEqual(
+      driver.resolveDeviceInfo({ platformName: 'iOS', deviceName: 'iPhone XR' }),
+      { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
+    );
+    assert.deepEqual(
+      driver.resolveDeviceInfo({ platformName: 'iOS', deviceUuid: '00008020-UDID' }),
+      { deviceName: '', platformName: 'iOS', osVersion: '' },
+    );
+    assert.deepEqual(
+      driver.resolveDeviceInfo({
+        platformName: 'iOS',
+        deviceName: 'iPhone XR',
+        deviceUuid: '00008020-UDID',
+        osVersion: '18.0',
+      }),
+      { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '18.0' },
+    );
+    assert.throws(
+      () => driver.resolveDeviceInfo({ platformName: 'iOS' }),
+      /deviceName or capabilities.deviceUuid is required/,
+    );
+  });
+});
+
+test('iOS local runs do not require a device identity', () => {
+  const driver = selectDriver('iOS');
+  withEnv({}, () => {
+    assert.deepEqual(
+      driver.resolveDeviceInfo({ platformName: 'iOS' }),
+      { deviceName: '', platformName: 'iOS', osVersion: '' },
+    );
+  });
+});
+
 test('iOS resolves `browser` to the connection itself', () => {
   const connection = { newContext() {} };
   assert.equal(selectDriver('iOS').resolveBrowser(connection), connection);

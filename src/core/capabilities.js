@@ -27,31 +27,21 @@ function activeSessionLogs(capabilities) {
   return SESSION_LOG_NAMES.filter((name) => !logLevelOff(name, levels[name]));
 }
 
-// Orchestrator WS path per platform; the orchestrator routes /safari to the iOS
-// bridge and /playwright to the Android server. Overridable to match a server
-// configured with non-default ORCH_*_WS_PATH values.
-const WS_PATHS = {
-  ios: (process.env.PWM_IOS_WS_PATH || '/safari'),
-  android: (process.env.PWM_ANDROID_WS_PATH || '/playwright'),
-};
-
 function platformKey(platform) {
   return String(platform || '').toLowerCase() === 'android' ? 'android' : 'ios';
 }
 
 // Endpoint as configured, userinfo included. Explicit per-platform env
 // (IOS_WS_ENDPOINT / ANDROID_WS_ENDPOINT) wins for back-compat and direct-server
-// runs; otherwise it is derived from a single PWM_ORCHESTRATOR base + platform
-// path. Empty string means "no farm" (local webkit.launch / ADB devices).
-// Capabilities ride the connect header, so any legacy ?query on the endpoint is
-// stripped; the orchestrator pool-matches on the header instead.
+// runs; otherwise PWM_ORCHESTRATOR is the full session endpoint (e.g.
+// wss://host:7465/sessions). Empty string means "no farm" (local webkit.launch /
+// ADB devices). Capabilities ride the connect header, so any legacy ?query on
+// the endpoint is stripped; the orchestrator pool-matches on the header instead.
 function rawWsEndpoint(platform) {
   const key = platformKey(platform);
   const explicit = key === 'android' ? process.env.ANDROID_WS_ENDPOINT : process.env.IOS_WS_ENDPOINT;
   if (explicit) return explicit.split('?')[0];
-  const base = (process.env.PWM_ORCHESTRATOR || '').replace(/\/+$/, '');
-  if (!base) return '';
-  return `${base}${WS_PATHS[key]}`.split('?')[0];
+  return (process.env.PWM_ORCHESTRATOR || '').split('?')[0];
 }
 
 function decodeUserinfo(value) {

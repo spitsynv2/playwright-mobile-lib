@@ -81,23 +81,23 @@ test('rejects an unknown browsing mode instead of silently defaulting', () => {
   );
 });
 
-test('moves endpoint userinfo into the Authorization header', () => {
-  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://alice:secret@orch.example.com:7465' }, () => {
-    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/safari');
-    assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/playwright');
+test('uses PWM_ORCHESTRATOR as the full session endpoint for every platform', () => {
+  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://alice:secret@orch.example.com:7465/sessions' }, () => {
+    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
+    assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/sessions');
     assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'alice:secret');
   });
 });
 
 test('percent-decodes userinfo so reserved characters survive the URL', () => {
-  withConnectEnv({ IOS_WS_ENDPOINT: 'wss://alice:s%40c%3Aret@orch.example.com:7465/safari' }, () => {
-    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/safari');
+  withConnectEnv({ IOS_WS_ENDPOINT: 'wss://alice:s%40c%3Aret@orch.example.com:7465/sessions' }, () => {
+    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'alice:s@c:ret');
   });
 });
 
 test('prefers explicit auth env over endpoint userinfo', () => {
-  const endpoint = 'wss://alice:secret@orch.example.com:7465';
+  const endpoint = 'wss://alice:secret@orch.example.com:7465/sessions';
   withConnectEnv({ PWM_ORCHESTRATOR: endpoint, PWM_AUTH_TOKEN: 'tok' }, () => {
     assert.equal(buildConnectHeaders({}, 'iOS').Authorization, 'Bearer tok');
   });
@@ -111,17 +111,17 @@ test('prefers explicit auth env over endpoint userinfo', () => {
 
 test('keeps basic auth from env on an endpoint without userinfo', () => {
   withConnectEnv({
-    PWM_ORCHESTRATOR: 'wss://orch.example.com:7465',
+    PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/sessions',
     PWM_AUTH_USER: 'alice',
     PWM_AUTH_PASSWORD: 'secret',
   }, () => {
-    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/safari');
+    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'alice:secret');
   });
 });
 
 test('sends no Authorization when no credentials are configured', () => {
-  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465' }, () => {
+  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/sessions' }, () => {
     assert.equal(buildConnectHeaders({}, 'iOS').Authorization, undefined);
   });
   withConnectEnv({}, () => {
@@ -130,12 +130,22 @@ test('sends no Authorization when no credentials are configured', () => {
   });
 });
 
-test('resolves credentials per platform endpoint', () => {
+test('resolves credentials per platform endpoint override', () => {
   withConnectEnv({
-    IOS_WS_ENDPOINT: 'wss://ios:pw1@orch.example.com:7465/safari',
-    ANDROID_WS_ENDPOINT: 'wss://android:pw2@orch.example.com:7465/playwright',
+    IOS_WS_ENDPOINT: 'wss://ios:pw1@orch.example.com:7465/sessions',
+    ANDROID_WS_ENDPOINT: 'wss://android:pw2@orch.example.com:7465/sessions',
   }, () => {
     assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'ios:pw1');
     assert.equal(decodeBasic(buildConnectHeaders({}, 'Android').Authorization), 'android:pw2');
+  });
+});
+
+test('does not append a platform path to PWM_ORCHESTRATOR', () => {
+  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/sessions' }, () => {
+    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
+    assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/sessions');
+  });
+  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/' }, () => {
+    assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/');
   });
 });
