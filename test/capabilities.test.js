@@ -8,6 +8,7 @@ const {
   effectiveCapabilities,
   resolveWsEndpoint,
   buildConnectHeaders,
+  resolveClientId,
 } = require('../src/core/capabilities');
 
 const CONNECT_ENV = [
@@ -148,4 +149,27 @@ test('does not append a platform path to PWM_ORCHESTRATOR', () => {
   withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/' }, () => {
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/');
   });
+});
+
+test('PWM_CLIENT_ID overrides auto identity', () => {
+  assert.equal(resolveClientId({ PWM_CLIENT_ID: 'run-fixed' }, 42), 'run-fixed');
+  assert.equal(resolveClientId({ IOS_CLIENT_ID: 'legacy' }, 42), 'legacy');
+});
+
+test('Playwright parallel index is stable across worker recycle', () => {
+  const env = { TEST_PARALLEL_INDEX: '0', TEST_WORKER_INDEX: '1' };
+  assert.equal(resolveClientId(env, 1001), 'pwm-p0-r1001');
+  // Same parallel slot + same runner after a failed-test worker restart.
+  assert.equal(resolveClientId({ TEST_PARALLEL_INDEX: '0', TEST_WORKER_INDEX: '7' }, 1001), 'pwm-p0-r1001');
+  assert.equal(resolveClientId({ TEST_PARALLEL_INDEX: '1' }, 1001), 'pwm-p1-r1001');
+  assert.equal(resolveClientId({ TEST_PARALLEL_INDEX: '0' }, 2002), 'pwm-p0-r2002');
+});
+
+test('without parallel index falls back to a unique id', () => {
+  const a = resolveClientId({ TEST_WORKER_INDEX: '3' }, 1);
+  const b = resolveClientId({ TEST_WORKER_INDEX: '3' }, 1);
+  assert.match(a, /^pwm-w3-/);
+  assert.match(b, /^pwm-w3-/);
+  assert.notEqual(a, b);
+  assert.match(resolveClientId({}, 1), /^pwm-/);
 });

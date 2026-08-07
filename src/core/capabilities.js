@@ -159,23 +159,23 @@ const connectTimeoutMs = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
 })();
 
-// Client identity sent as x-pwm-client-id; the orchestrator pins a device to this
-// id across a wedge restart. Resolved once at module load so it stays stable for
-// the worker's whole lifetime (every per-test reconnect keeps device priority)
-// while being unique per worker process. Override with PWM_CLIENT_ID (or the
-// legacy IOS_CLIENT_ID) to pin an explicit id (e.g. a shared run id across workers).
-const clientId = (() => {
-  const explicit = (process.env.PWM_CLIENT_ID || process.env.IOS_CLIENT_ID || '').trim();
+// TEST_PARALLEL_INDEX + runner PID: stable across worker recycle, unique across concurrent runs.
+function resolveClientId(env = process.env, ppid = process.ppid) {
+  const explicit = (env.PWM_CLIENT_ID || env.IOS_CLIENT_ID || '').trim();
   if (explicit) return explicit;
-  const worker = (process.env.TEST_WORKER_INDEX || '').trim();
+  const parallel = (env.TEST_PARALLEL_INDEX || '').trim();
+  if (parallel !== '') return `pwm-p${parallel}-r${ppid}`;
   let rand;
   try {
     rand = require('crypto').randomUUID();
   } catch {
     rand = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   }
+  const worker = (env.TEST_WORKER_INDEX || '').trim();
   return worker ? `pwm-w${worker}-${rand}` : `pwm-${rand}`;
-})();
+}
+
+const clientId = resolveClientId();
 
 module.exports = {
   resolveWsEndpoint,
@@ -187,4 +187,5 @@ module.exports = {
   slowMoMs,
   connectTimeoutMs,
   clientId,
+  resolveClientId,
 };
