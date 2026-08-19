@@ -29,9 +29,9 @@
     "url": "github:spitsynv2/playwright-mobile-lib"
   },
   "peerDependencies": {
-    "@playwright/test": ">=1.58.0",
+    "@playwright/test": ">=1.58.2",
     "@zebrunner/javascript-agent-playwright": "*",
-    "playwright": ">=1.58.0"
+    "playwright": ">=1.58.2"
   },
   "peerDependenciesMeta": {
     "@zebrunner/javascript-agent-playwright": {
@@ -40,10 +40,10 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": ">=1.58.2",
     "@types/node": "^22.20.1",
     "esbuild": "^0.28.1",
-    "playwright": "^1.62.0",
+    "playwright": ">=1.58.2",
     "typescript": "^7.0.2"
   }
 }

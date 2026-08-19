@@ -20,8 +20,8 @@ reproducible:
 // package.json
 {
   "devDependencies": {
-    "@playwright/test": ">=1.58.0",
-    "playwright": ">=1.58.0",
+    "@playwright/test": ">=1.58.2",
+    "playwright": ">=1.58.2",
     "playwright-mobile-lib": "github:spitsynv2/playwright-mobile-lib#<commit-sha>"
   }
 }
@@ -33,6 +33,10 @@ npm install
 
 `@zebrunner/javascript-agent-playwright` is an optional peer dependency. Install
 and configure it only when Zebrunner reporting is needed.
+
+The minimum supported Playwright version is `1.58.2`, the version used for the
+original bridge implementation and the current validated default. Users can
+select a newer version, but it can be less stable.
 
 Node.js 22 or newer is required; Node 24 LTS is recommended. The
 `playwright` and `@playwright/test` versions used by tests must match the
