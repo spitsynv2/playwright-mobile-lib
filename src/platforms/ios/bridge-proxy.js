@@ -20,12 +20,18 @@ const {
 // fresh context cleanly.
 const PAGE_INVALIDATING_OPS = new Set(['clearSafariHistory']);
 
-// A page-invalidating op kills the tab's WebContent process, so the bridge's
-// "ok" can race the target teardown; page.evaluate then rejects with a close
-// error instead of returning. For those ops the close IS the success signal.
-const TARGET_CLOSED_ERROR = /Target (page, context or browser has been|closed)/i;
+// A page-invalidating op kills the tab's WebContent process. The bridge acks
+// before Settings runs, but a close error is still treated as success.
+const TARGET_CLOSED_ERROR = /Target (page, context or browser has been|closed)|has been closed/i;
 const WRAPPED_METHOD = Symbol('playwright-mobile-lib.wrapped-method');
 const patchedPagePrototypes = new WeakSet();
+
+async function closeInvalidatedPage(page) {
+  if (typeof page.isClosed === 'function' && page.isClosed()) return;
+  try {
+    await page.close();
+  } catch {}
+}
 
 // page.bridge.<op>(args?) forwards to the bridge's in-process op handler.
 // Any op added in internal/handlers/bridge_call.go is auto-callable here —
@@ -44,7 +50,7 @@ function makeBridgeProxy(page) {
           result = 'ok';
         }
         if (invalidating) {
-          try { await page.close(); } catch {}
+          await closeInvalidatedPage(page);
         }
         return result;
       });

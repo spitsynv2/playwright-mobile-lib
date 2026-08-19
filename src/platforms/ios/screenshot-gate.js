@@ -23,8 +23,11 @@ function blankScreenshot(options) {
   return blank;
 }
 
-function isTimeoutError(error) {
-  return error?.name === 'TimeoutError' || String(error).startsWith('TimeoutError:');
+function isUnavailableScreenshotError(error) {
+  const message = error && error.message ? error.message : String(error);
+  return error?.name === 'TimeoutError'
+    || String(error).startsWith('TimeoutError:')
+    || /Target (page, context or browser has been|closed)|has been closed/i.test(message);
 }
 
 // Resolves true only if this page's Safari tab is confirmed foreground within
@@ -60,7 +63,7 @@ function installForegroundScreenshotGate(PageProto) {
       try {
         return await originalScreenshot.call(this, options);
       } catch (error) {
-        if (!isTimeoutError(error)) throw error;
+        if (!isUnavailableScreenshotError(error)) throw error;
         return blankScreenshot(options);
       }
     }
