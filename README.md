@@ -38,12 +38,13 @@ The minimum supported Playwright version is `1.58.2`, the version used for the
 original bridge implementation and the current validated default. Users can
 select a newer version, but it can be less stable.
 
-Node.js 22 or newer is required; Node 24 LTS is recommended. The
+Node.js 22 or newer is required. Node 24 LTS is recommended. The
 `playwright` and `@playwright/test` versions used by tests must match the
 Playwright version the device containers run. The mobile orchestrator reads the
 client version from Playwright's connect `User-Agent` and starts or restarts
-the bridge container with that version; its `ORCH_PLAYWRIGHT_VERSION` is only a
-fallback. A directly managed bridge still needs the matching
+the bridge container with that version.
+
+Its `ORCH_PLAYWRIGHT_VERSION` is only a fallback. A directly managed bridge still needs the matching
 `PLAYWRIGHT_VERSION` set by its operator.
 
 ## Quickstart
@@ -123,14 +124,14 @@ no environment-variable fallbacks for device capabilities.
 | --- | --- | --- |
 | `platformName` | `'iOS' \| 'Android'` | Required. Selects the platform driver and route. |
 | `deviceName` | `string` | Device pool pin, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). Required for Android farm runs. For iOS farm runs, provide `deviceName` and/or `deviceUuid`. Also selects the local emulation preset when set. |
-| `deviceUuid` | `string` | iOS device UDID pool pin (case-insensitive). Alone is enough for an iOS farm run; with `deviceName` both must resolve to the same device. |
+| `deviceUuid` | `string` | iOS device UDID pool pin (case-insensitive). Alone is enough for an iOS farm run. With `deviceName` both must resolve to the same device. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
-| `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled; enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
+| `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled. Enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
-| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Per-container verbosity. iOS uses all three sources and restarts a warm container when the set changes. Android forwards `bridge` and `pwserver` when starting its container; `inspector` is iOS-only. The Go bridge and Playwright server implement `off`/`info`/`debug`/`trace`; the iOS container normalizes inspector aliases `fatal`/`warn` to Uvicorn's `critical`/`warning`. |
+| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Per-container verbosity. iOS uses all three sources and restarts a warm container when the set changes. Android forwards `bridge` and `pwserver` when starting its container. `inspector` is iOS-only. The Go bridge and Playwright server implement `off`/`info`/`debug`/`trace`. The iOS container normalizes inspector aliases `fatal`/`warn` to Uvicorn's `critical`/`warning`. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
 reuses one tab for the whole run instead of opening a tab per page. iOS honors
@@ -139,7 +140,7 @@ the device's browser cannot provide an isolated tab, the run continues in the
 normal profile with a warning instead of failing.
 
 `single-tab-*` is iOS-only. Android force-stops and relaunches Chrome for every
-test, so no tab can span a run; a single-tab request there runs as `public` or
+test, so no tab can span a run. A single-tab request there runs as `public` or
 `private` and warns once. Use the plain modes on Android.
 
 `browsingMode: process.env.BROWSING_MODE || 'private'` needs no cast. The
@@ -155,7 +156,7 @@ honors (`viewport`, `locale`, `timezoneId`, `geolocation`, `permissions`,
 the rest of that set), plus `args` for extra browser flags and `pkg` to select
 the browser package. Autocomplete lists the full set. A physical Android context
 defaults `hasTouch` to `true`, so `locator.tap()` and `touchscreen` work without
-an extra capability; an explicit `hasTouch: false` is still honored.
+an extra capability. An explicit `hasTouch: false` is still honored.
 
 ## Fixtures and options
 
@@ -198,14 +199,14 @@ These additions are platform-specific:
 
 | API | Availability |
 | --- | --- |
-| `page.bridge.<operation>(args?)` | Both platforms, with a per-platform operation set. iOS serves the full set; Android serves `getSessionId` and `getDeviceInfo`. |
+| `page.bridge.<operation>(args?)` | Both platforms, with a per-platform operation set. iOS serves the full set. Android serves `getSessionId` and `getDeviceInfo`. |
 | `page.appium.<method>(...)` / `locator.appium.<method>(...)` | iOS only |
 | `page.setBrowsingMode('private' \| 'public')` | iOS only |
 | `withAppiumInputMode(page, fn)` | iOS only |
-| `reopenInMode` | iOS only; ignored on Android |
+| `reopenInMode` | iOS only. Ignored on Android |
 | `resolveIOSDevicePreset()` | iOS only |
-| `browser` fixture | iOS and local pre-flight runs; throws on an Android device run |
-| `device` fixture | Android device runs only; throws on iOS and on local pre-flight runs |
+| `browser` fixture | iOS and local pre-flight runs. Throws on an Android device run |
+| `device` fixture | Android device runs only. Throws on iOS and on local pre-flight runs |
 
 ### Native UI on Android: the `device` fixture
 
@@ -220,7 +221,7 @@ which is Playwright's own UIAutomator-over-adb surface. It works the same on a
 farm run and on an ADB run, because the calls are dispatched to whichever process
 owns adb. Selector-based methods (`tap`, `longTap`, `fill`, `press`, `wait`,
 `info`, `scroll`, `swipe`, `fling`, `pinchOpen`, `pinchClose`) take an
-`AndroidSelector`; `device.input.*` covers raw coordinates, and `device.shell()`
+`AndroidSelector`. `device.input.*` covers raw coordinates, and `device.shell()`
 runs an adb shell command.
 
 ```js
@@ -282,7 +283,7 @@ through with the reason on hover, before the test is ever run.
 | --- | --- | --- |
 | `page.setViewportSize()` | iOS, Android | Select a device with `capabilities.deviceName`. |
 | `page.emulateMedia()` | iOS | Change the setting on the device. |
-| `page.hover()`, `locator.hover()` | iOS | Tap; touch devices fire pointer events on tap only. |
+| `page.hover()`, `locator.hover()` | iOS | Tap. Touch devices fire pointer events on tap only. |
 | `page.setInputFiles()`, `locator.setInputFiles()` | iOS | Not available: the native file picker is not driveable. |
 | `mouse.wheel()` | iOS | `locator.scrollIntoViewIfNeeded()` or `page.evaluate(() => scrollBy(...))`. |
 | `context.cookies()`, `addCookies()`, `clearCookies()`, `storageState()` | iOS | Not available: the cookie jar is shared across the device. |
@@ -315,7 +316,7 @@ Only three cannot be applied:
 | --- | --- |
 | `storageState` | `launchBrowser()` does not take it. Restore the cookies yourself with `context.addCookies()`, which Android allows in `public` browsing mode. |
 | `clientCertificates` | `launchBrowser()` does not take them. |
-| `video` | The farm records the session video; use `extraContextOptions.recordVideo` for a per-context recording. |
+| `video` | The farm records the session video. Use `extraContextOptions.recordVideo` for a per-context recording. |
 
 One caveat applies to the `private` browsing modes. Chrome for Android serves the
 incognito tab from a separate profile, but CDP applies `context.grantPermissions()`,
@@ -334,7 +335,7 @@ device's profile or system settings:
 | `locale`, `timezoneId`, `colorScheme`, `reducedMotion`, `forcedColors`, `contrast` | Change the setting in iOS Settings. |
 | `permissions` | Grant permissions in iOS Settings or through the system prompt. |
 | `geolocation`, `offline` | Not available: real GPS, and only airplane mode takes the device offline. |
-| `storageState` | Sign in through the UI or inject a token; the cookie jar is shared. |
+| `storageState` | Sign in through the UI or inject a token. The cookie jar is shared. |
 | `httpCredentials` | Send `extraHTTPHeaders: { Authorization: 'Basic <base64>' }` for preemptive Basic auth. |
 | `proxy`, `ignoreHTTPSErrors`, `javaScriptEnabled`, `bypassCSP`, `acceptDownloads` | Not available: Safari and iOS own these. |
 | `video` | The farm records the session video. |
@@ -355,7 +356,7 @@ config must work on every path. On real Android, the raw
 
 Both the forwarding and the warnings read the config, so a per-file
 `test.use({ viewport })` is not covered by either. Use
-`test.use({ extraContextOptions: { ... } })` for per-file context options; it is
+`test.use({ extraContextOptions: { ... } })` for per-file context options. It is
 applied directly by the driver on both platforms and wins over everything else.
 
 Where an option is ignored, the library warns once naming the option and the
@@ -388,8 +389,8 @@ const { test, expect } = require('playwright-mobile-lib');
 | `PWM_ORCHESTRATOR` | Full session WebSocket URL, e.g. `wss://orch.example.com:7465/sessions`. Platform comes from `capabilities.platformName`. May carry `user:pass@` userinfo. Leave unset for local runs. |
 | `IOS_WS_ENDPOINT` | Full iOS WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for iOS. |
 | `ANDROID_WS_ENDPOINT` | Full Android WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for Android. |
-| `PWM_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. Defaults to `120000`; the connection fixture timeout is this value plus 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
-| `PWM_CLIENT_ID` | Stable `x-pwm-client-id` used for device pinning across reconnects. When absent, the default id uses `TEST_PARALLEL_INDEX` plus the runner PID so Playwright worker recycles keep the same pin; otherwise a unique id is generated once per worker process. The legacy `IOS_CLIENT_ID` is still accepted. |
+| `PWM_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. Defaults to `120000`. The connection fixture timeout is this value plus 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
+| `PWM_CLIENT_ID` | Stable `x-pwm-client-id` used for device pinning across reconnects. When absent, the default id uses `TEST_PARALLEL_INDEX` plus the runner PID so Playwright worker recycles keep the same pin. Otherwise a unique id is generated once per worker process. The legacy `IOS_CLIENT_ID` is still accepted. |
 | `PWM_TAB_CLOSE_TIMEOUT_MS` | Android: how long a single tab close may take during a sweep before the run moves on. Defaults to `5000`. |
 | `PWM_AUTH_HEADER` | Complete `Authorization` header value. Highest auth precedence. |
 | `PWM_AUTH_TOKEN` | Bearer token used when `PWM_AUTH_HEADER` is empty. |
@@ -397,7 +398,7 @@ const { test, expect } = require('playwright-mobile-lib');
 | `PWM_AUTH_PASSWORD` | Basic-auth password paired with `PWM_AUTH_USER`. |
 | `PLAYWRIGHT_SLOW_MO_MS` | Non-negative delay between Playwright operations in milliseconds. Defaults to `0`. |
 | `ANDROID_SERIAL` | Direct-ADB device serial used when no WebSocket endpoint is configured. |
-| `PWM_ANDROID_ADB` | Set exactly to `true` to select a direct ADB device without a serial; exactly one device must be available. |
+| `PWM_ANDROID_ADB` | Set exactly to `true` to select a direct ADB device without a serial. Exactly one device must be available. |
 | `ADB_SERVER_HOST` / `ADB_SERVER_PORT` | Direct-ADB server address. Defaults to `127.0.0.1:5037`. |
 | `ANDROID_OMIT_DRIVER_INSTALL` | Set exactly to `true` to skip Playwright's Android driver installation in direct-ADB mode. |
 | `REPORTING_ENABLED` | Set exactly to `true` to enable the optional Zebrunner integration. Defaults to disabled. |
@@ -405,7 +406,7 @@ const { test, expect } = require('playwright-mobile-lib');
 Authentication is intended for an orchestrator behind an auth proxy, such as the
 TLS + basic-auth nginx sidecar shipped with `playwright-mobile-orchestrator`.
 The `Authorization` value is sent as a Playwright connect header on both
-platforms; credentials never reach the endpoint URL Playwright connects to.
+platforms. Credentials never reach the endpoint URL Playwright connects to.
 Precedence is `PWM_AUTH_HEADER`, then `PWM_AUTH_TOKEN` as `Bearer <token>`, then
 `PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` as HTTP Basic, then userinfo in the
 endpoint URL.
@@ -418,7 +419,7 @@ PWM_ORCHESTRATOR=wss://alice:secret@orch.example.com:7465/sessions
 
 The library strips `alice:secret@` before connecting and sends it as
 `Authorization: Basic …`. Percent-encode reserved characters in the password
-(`@` as `%40`, `:` as `%3A`); prefer `PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` when
+(`@` as `%40`, `:` as `%3A`). Prefer `PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` when
 the password is awkward to encode or the URL would end up in shell history.
 
 ## Extending `test` (fixtures, page objects, TypeScript)
@@ -480,9 +481,9 @@ IDE documentation automatically.
 In a checked JavaScript config, keep `capabilities` inline under
 `defineConfig({ projects: [...] })` to receive contextual typing without a
 JSDoc annotation. Extracting the object into a standalone `const` widens literal
-values such as `'iOS'`; annotate that standalone object as `Capabilities` if
+values such as `'iOS'`. Annotate that standalone object as `Capabilities` if
 extraction is necessary. Environment-derived `browsingMode` and gate strings
-remain valid inputs; `browsingMode` is checked by the library when session
+remain valid inputs. `browsingMode` is checked by the library when session
 setup begins.
 
 One JavaScript caveat is independent of this library: a parameter on a plain
@@ -509,12 +510,12 @@ When `REPORTING_ENABLED=true` and the optional Zebrunner package is installed,
 each test attaches its device capabilities and a session label to the current
 Zebrunner test. The reporter registers a Zebrunner test session with the bridge
 session ID. Farm `video.mp4` and combined `session.log` artifacts remain in farm
-storage; the test process and reporter do not download or re-upload them.
+storage. The test process and reporter do not download or re-upload them.
 
 Structured actions are recorded for page creation, navigation, `page.bridge.*`,
 `page.setBrowsingMode()`, and `page.appium.*` / `locator.appium.*` when the
 installed agent exposes action reporting. Captured parameters are bounded to
-8 KiB; common secret fields, sensitive URL values, and native input values are
+8 KiB. Common secret fields, sensitive URL values, and native input values are
 redacted. If reporting is disabled, the package is absent, or structured actions
 are unavailable, test behavior is unchanged.
 
@@ -574,5 +575,5 @@ bridge or the orchestrator.
 Playwright Mobile Library is released under version 2.0 of the
 [Apache License](https://www.apache.org/licenses/LICENSE-2.0).
 
-The distributed bundle contains only this project's own code; Playwright and the
+The distributed bundle contains only this project's own code. Playwright and the
 optional Zebrunner reporter stay external dependencies and are not redistributed.
