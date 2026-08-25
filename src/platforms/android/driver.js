@@ -20,7 +20,6 @@ const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsuppo
 const { makeBridgeProxy } = require('./bridge-proxy');
 const { makeDeviceProxy } = require('./device-proxy');
 const {
-  attachTestSession,
   attachSessionCapabilities,
   attachDeviceLabel,
   buildSessionCapabilities,
@@ -481,8 +480,6 @@ const driver = {
     } catch {}
     if (sessionId && testInfo) {
       const reportingCapabilities = buildSessionCapabilities('Android', resolvedDeviceInfo);
-      testInfo.annotations.push({ type: 'sessionId', description: sessionId });
-      attachTestSession(sessionId);
       attachSessionCapabilities(sessionId, reportingCapabilities);
       attachDeviceLabel(resolvedDeviceInfo.deviceName);
     }

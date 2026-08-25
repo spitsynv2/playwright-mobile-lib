@@ -5,7 +5,6 @@ const { webkit, devices } = require('@playwright/test');
 
 const { resolveIOSDevicePreset } = require('./custom-devices');
 const {
-  attachTestSession,
   attachSessionCapabilities,
   attachDeviceLabel,
   buildSessionCapabilities,
@@ -131,8 +130,6 @@ const driver = {
     } catch {}
     if (sessionId) {
       const reportingCapabilities = buildSessionCapabilities('iOS', resolvedDeviceInfo);
-      testInfo.annotations.push({ type: 'sessionId', description: sessionId });
-      attachTestSession(sessionId);
       attachSessionCapabilities(sessionId, reportingCapabilities);
       attachDeviceLabel(resolvedDeviceInfo.deviceName);
     }

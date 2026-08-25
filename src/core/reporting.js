@@ -21,15 +21,6 @@ if (reportingEnabled) {
   }
 }
 
-function attachTestSession(sessionId) {
-  if (!reportingEnabled || !sessionId || !currentTest) return;
-  try {
-    currentTest.attachLabel('sessionId', sessionId);
-  } catch (err) {
-    console.warn(`reporting-agent: failed to attach session to Zebrunner: ${err.message}`);
-  }
-}
-
 function attachAction(action) {
   if (!isActionReportingAvailable()) return false;
   try {
@@ -87,7 +78,6 @@ function buildSessionCapabilities(platform, deviceInfo = {}) {
 module.exports = {
   attachAction,
   isActionReportingAvailable,
-  attachTestSession,
   attachSessionCapabilities,
   attachDeviceLabel,
   buildSessionCapabilities,
