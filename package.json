@@ -22,7 +22,11 @@
     "build": "esbuild index.js --bundle --platform=node --target=node22 --format=cjs --minify --legal-comments=none --packages=external --outfile=dist/index.js",
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "npm run build && npm run typecheck && node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && node test/screenshot-gate.test.js && node --test test/telemetry.test.js test/reporting.test.js test/capabilities.test.js test/device-name.test.js test/use-guard.test.js test/fixture-wiring.test.js test/bundle.test.js"
+    "lint": "eslint .",
+    "unit": "node --test test/telemetry.test.js test/reporting.test.js test/capabilities.test.js test/device-name.test.js test/use-guard.test.js test/fixture-wiring.test.js test/bundle.test.js test/appium.test.js test/unsupported.test.js test/bridge-proxy-ios.test.js test/bridge-proxy-android.test.js test/ios-driver.test.js test/screenshot-gate.test.js",
+    "test": "npm run build && npm run typecheck && node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && npm run unit",
+    "test:coverage": "c8 --config .c8rc.json npm run unit",
+    "test:pack": "node --test test/pack-smoke.test.js"
   },
   "repository": {
     "type": "git",
@@ -40,9 +44,13 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": ">=1.58.2",
     "@types/node": "^22.20.1",
+    "c8": "^12.0.0",
     "esbuild": "^0.28.1",
+    "eslint": "^10.9.1",
+    "globals": "^17.12.0",
     "playwright": ">=1.58.2",
     "typescript": "^7.0.2"
   }

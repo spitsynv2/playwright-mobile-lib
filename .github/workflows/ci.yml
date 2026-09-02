@@ -1,32 +1,34 @@
-name: Publish package to NPM
+name: CI
 
 on:
-  workflow_dispatch: # Manual run only
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  publish:
+  test:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22', '24']
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - name: install node v24
+      - name: install node v${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: ${{ matrix.node-version }}
           cache: npm
-          registry-url: https://registry.npmjs.org
       - name: npm ci
         run: npm ci
       - name: lint
         run: npm run lint
       - name: build, type-check, and unit tests
-        run: npm run test
+        run: npm test
       - name: coverage thresholds
         run: npm run test:coverage
       - name: packed tarball smoke test
         run: npm run test:pack
-      - uses: JS-DevTools/npm-publish@v4
-        with:
-          access: public
-          token: ${{ secrets.NPM_TOKEN }}

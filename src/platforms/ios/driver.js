@@ -102,7 +102,7 @@ const driver = {
     return context;
   },
 
-  async createPage(context, { deviceInfo, reopenInMode, testInfo }) {
+  async createPage(context, { deviceInfo, reopenInMode }) {
     let page = await recordAction('fixture', 'fixture.page.create', {}, () => context.newPage());
     ensureAppiumPrototypesPatched(page);
 
