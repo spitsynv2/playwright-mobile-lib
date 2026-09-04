@@ -96,9 +96,23 @@ function assertBrowsingMode(value) {
   );
 }
 
+// The orchestrator reads idleTimeoutMs as an integer millisecond count and frees
+// the device after that much silence; 0 disables it. A negative or non-integer
+// value would be dropped server-side, so fail here to keep the mistake visible.
+function assertIdleTimeoutMs(value) {
+  if (value === undefined || value === null) return;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new Error(
+      'playwright-mobile-lib: capabilities.idleTimeoutMs must be a non-negative integer of '
+      + `milliseconds (0 disables the orchestrator idle timeout), got ${JSON.stringify(value)}.`,
+    );
+  }
+}
+
 function effectiveCapabilities(capabilities) {
   const caps = capabilities || {};
   assertBrowsingMode(caps.browsingMode);
+  assertIdleTimeoutMs(caps.idleTimeoutMs);
   return caps;
 }
 

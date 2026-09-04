@@ -173,6 +173,13 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   clickNavRetriesEnabled?: GateFlag;
   /** Per-container verbosity; Android uses `bridge` and `pwserver`, while `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
+  /**
+   * Idle timeout in milliseconds for this device's session. The orchestrator
+   * frees the device when no traffic crosses the connection for this window.
+   * Omit to use the orchestrator default (`ORCH_SESSION_IDLE_TIMEOUT`, 1 minute);
+   * `0` disables the idle timeout for this session. Must be a non-negative integer.
+   */
+  idleTimeoutMs?: number;
 }
 
 /** Worker-scoped options added by this library. */

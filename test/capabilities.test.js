@@ -82,6 +82,26 @@ test('rejects an unknown browsing mode instead of silently defaulting', () => {
   );
 });
 
+test('passes a non-negative integer idleTimeoutMs through to the header', () => {
+  assert.equal(effectiveCapabilities({ platformName: 'iOS', idleTimeoutMs: 60000 }).idleTimeoutMs, 60000);
+  assert.equal(effectiveCapabilities({ idleTimeoutMs: 0 }).idleTimeoutMs, 0);
+});
+
+test('leaves an unset idleTimeoutMs to the orchestrator default', () => {
+  assert.doesNotThrow(() => effectiveCapabilities({ platformName: 'iOS' }));
+  assert.doesNotThrow(() => effectiveCapabilities({ idleTimeoutMs: undefined }));
+  assert.doesNotThrow(() => effectiveCapabilities({ idleTimeoutMs: null }));
+});
+
+test('rejects a negative or non-integer idleTimeoutMs instead of dropping it server-side', () => {
+  for (const bad of [-1, 1.5, '1000', NaN, Infinity]) {
+    assert.throws(
+      () => effectiveCapabilities({ platformName: 'iOS', idleTimeoutMs: bad }),
+      /idleTimeoutMs must be a non-negative integer/,
+    );
+  }
+});
+
 test('uses PWM_ORCHESTRATOR as the full session endpoint for every platform', () => {
   withConnectEnv({ PWM_ORCHESTRATOR: 'wss://alice:secret@orch.example.com:7465/sessions' }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
