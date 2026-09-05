@@ -1,7 +1,7 @@
 {
   "name": "playwright-mobile-lib",
   "version": "1.0.0",
-  "description": "Cross-platform Playwright mobile fixture (iOS Safari + Android Chrome): connection, capabilities, appium input mode, unsupported-API guards, Zebrunner reporting.",
+  "description": "Cross-platform Playwright mobile fixture for iOS Safari and Android Chrome.",
   "private": true,
   "main": "dist/index.js",
   "types": "index.d.ts",

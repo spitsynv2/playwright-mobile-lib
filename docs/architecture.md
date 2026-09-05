@@ -26,8 +26,8 @@ adds the mobile pieces:
 - `defineConfig`, `devices`, `mergeTests`, and the rest of Playwright, passed
   through unchanged.
 
-The build bundles `index.js` into `dist/index.js` with esbuild. Playwright and
-the optional Zebrunner reporter stay external, so they are not redistributed.
+The build bundles `index.js` into `dist/index.js` with esbuild. Runtime
+dependencies stay external, so the bundle does not redistribute them.
 
 ## Fixture model
 
@@ -46,8 +46,8 @@ Option fixtures:
 Worker fixtures:
 
 - `_driver` — the platform driver, selected from `capabilities.platformName`.
-- `_connection` — the platform connection. It has a longer timeout, so a slow
-  container start does not consume the test timeout.
+- `_connection` — the platform connection. It has a separate connection
+  timeout, so it does not consume the test timeout.
 - `browser` — the platform browser. It replaces Playwright's built-in browser,
   so no local browser starts next to the device.
 - `device` — Android device runs only. The `AndroidDevice` for native UI.
@@ -81,8 +81,8 @@ src/platforms/index.js       selectDriver(platformName)
 src/core/
   capabilities.js            Endpoint, auth, timeout, client-id, browsing-mode
   device-name.js             Device-name matching across separators and case
-  reporting.js               Zebrunner session, capabilities, and label
-  telemetry.js               recordAction: bounded, redacted action reporting
+  reporting.js               Optional reporting adapter
+  telemetry.js               Bounded and redacted action data
   unsupported.js             defineThrowing / defineCaveatWarning helpers
   use-guard.js               warnUnsupportedUseOptions
   context-patch.js           Wrap newPage / close on a consumer context
@@ -97,7 +97,7 @@ src/platforms/ios/
 
 src/platforms/android/
   driver.js                  Launch Chrome, forward use options, tab hygiene
-  bridge-proxy.js            page.bridge over a sentinel evaluate
+  bridge-proxy.js            Android page.bridge extension
   device-proxy.js            The device fixture wrapper
   unsupported-android.js     Android restriction tables
 ```
@@ -108,33 +108,25 @@ Where the test runs depends on the environment, not on the test code.
 
 - No endpoint set. The driver launches a local browser: WebKit on iOS, Chromium
   on Android. This is the pre-flight path. It emulates the requested device.
-- An endpoint set. The driver connects to the orchestrator or a direct bridge.
+- An endpoint set. The driver connects to a remote session endpoint.
   `PWM_ORCHESTRATOR` is the shared session URL. `IOS_WS_ENDPOINT` and
   `ANDROID_WS_ENDPOINT` override it per platform.
 
-Capabilities travel as a connect header. The orchestrator pool-matches a free
-device against them. Authentication travels as an `Authorization` connect
-header, so credentials never reach the endpoint URL.
+Capabilities travel as a connect header to the remote service. Authentication
+travels as an `Authorization` connect header. Credentials do not remain in the
+endpoint URL.
 
 `src/core/capabilities.js` owns this resolution: the endpoint, the auth
 precedence, the connect timeout, and the stable client id used to pin a device
 across reconnects.
 
-## The bridge
+## Device operations
 
-`page.bridge.<op>(args?)` reaches the device bridge. The two platforms use
-different transports, but the call shape is the same:
+`page.bridge.<op>(args?)` calls a supported device operation. Both platforms
+use the same call shape. The available operations depend on the platform.
 
-- iOS. The op goes through the WebInspector RPC. A page-invalidating op, such
-  as a history clear, kills the tab process, so the proxy closes the page after
-  the call and treats a target-closed error as success.
-- Android. The op is a sentinel string that `page.evaluate` sends. The Go
-  bridge intercepts it and routes it to its op handler. A navigation can
-  destroy the execution context mid-call, so the proxy retries a bounded number
-  of times.
-
-Any op added on the bridge side is callable here without per-op wiring in the
-fixture.
+Some operations invalidate the current page. The library applies the required
+page cleanup and bounded retries.
 
 ## Platform extensions and guards
 
@@ -143,19 +135,10 @@ The driver patches the Playwright `Page`, `Locator`, `Mouse`, and
 
 - It adds `page.bridge`, `page.appium`, `locator.appium`, and
   `page.setBrowsingMode` (iOS).
-- It wraps navigation and forced pointer actions for reporting and for the
-  iOS hit-test bypass.
+- It wraps navigation for optional action integrations.
+- It wraps forced pointer actions for the iOS hit-test bypass.
 - It replaces APIs a shared physical device cannot support with throwers that
   explain the alternative. The type definitions mark these `@deprecated`, so an
   editor shows them struck through before a run.
 - It warns once about `use` options the device cannot honor, instead of failing
   the run.
-
-## Reporting
-
-Reporting is optional and off by default. When `REPORTING_ENABLED=true` and the
-Zebrunner agent is installed, each test attaches its device capabilities and a
-session label, and structured actions are recorded. `src/core/telemetry.js`
-bounds each payload to 8 KiB and redacts secrets, sensitive URL values, and
-native input text. When reporting is off or the agent is absent, behavior is
-unchanged.

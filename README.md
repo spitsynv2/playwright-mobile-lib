@@ -1,7 +1,6 @@
 # playwright-mobile-lib
 
-**Status: 1.0.0 (beta).** The API is stable and the automated checks pass. A
-general release follows a green real-device run on each platform.
+**Current release: 1.0.0 beta.**
 
 Cross-platform Playwright fixtures for mobile web testing on real devices:
 
@@ -28,12 +27,12 @@ test('opens a page', async ({ page }) => {
 | Install, quickstart, and where tests run | [docs/getting-started.md](docs/getting-started.md) |
 | Capabilities, context options, and environment variables | [docs/configuration.md](docs/configuration.md) |
 | Fixtures, platform-specific and blocked APIs, and extending `test` | [docs/api.md](docs/api.md) |
-| Design and internal module map | [docs/architecture.md](docs/architecture.md) |
+| Design and contributor module map | [docs/architecture.md](docs/architecture.md) |
 
 ## License
 
 Playwright Mobile Library is released under version 2.0 of the
 [Apache License](https://www.apache.org/licenses/LICENSE-2.0).
 
-The distributed bundle contains only this project's own code. Playwright and the
-optional Zebrunner reporter stay external dependencies and are not redistributed.
+The distributed bundle contains only this project's code. Runtime dependencies
+are not redistributed.

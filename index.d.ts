@@ -45,17 +45,17 @@ export function resolveIOSDevicePreset(
  */
 export function withAppiumInputMode<T>(page: Page, fn: () => Promise<T> | T): Promise<T>;
 
-/** Per-container log verbosity. `'off'` disables that component's configured debug logging. */
+/** Remote session log level. `'off'` disables logs from the selected source. */
 export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 /**
  * On/off capability. Prefer a boolean; `'true'` / `'false'` (also `'1'` / `'0'`)
  * are accepted so an environment variable can be passed through unparsed.
- * Farm validation rejects invalid strings; local drivers treat them as unset.
+ * The library rejects invalid strings during remote session setup.
  */
 export type GateFlag = boolean | 'true' | 'false' | (string & {});
 
-/** Container log sources; `inspector` is iOS-only. */
+/** Remote session log sources. `inspector` is iOS-only. */
 export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
 
 /**
@@ -133,16 +133,15 @@ type AndroidLaunchCapabilities = Pick<
 };
 
 /**
- * Desired capabilities for a project/run. Sent to the orchestrator as the
- * `x-pwm-capabilities` connect header, which pool-matches a free device. Set
- * per-project via `use: { capabilities }`.
+ * Desired capabilities for a project or run. Set these per project with
+ * `use: { capabilities }`.
  */
 export interface Capabilities extends AndroidLaunchCapabilities {
-  /** Selects the platform driver and orchestrator route. Required. */
+  /** Selects the platform. Required. */
   platformName: 'iOS' | 'Android';
-  /** Device pool-match filter (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Spaces/underscores/hyphens/case are interchangeable. For iOS farm runs, provide this and/or `deviceUuid`. */
+  /** Remote device selector (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Spaces, underscores, hyphens, and case are interchangeable. For remote iOS runs, provide this value, `deviceUuid`, or both. */
   deviceName?: IOSDeviceName;
-  /** iOS device UDID pool-match filter. For iOS farm runs, provide this and/or `deviceName`. */
+  /** iOS device UDID selector. For remote iOS runs, provide this value, `deviceName`, or both. */
   deviceUuid?: string;
   /** Android device serial for direct-ADB selection (or set `ANDROID_SERIAL`). */
   serial?: string;
@@ -171,20 +170,19 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   navKickEnabled?: GateFlag;
   /** iOS: bridge click-nav retry gate. */
   clickNavRetriesEnabled?: GateFlag;
-  /** Per-container verbosity; Android uses `bridge` and `pwserver`, while `inspector` is iOS-only. */
+  /** Remote session log levels. Android uses `bridge` and `pwserver`. `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
   /**
-   * Idle timeout in milliseconds for this device's session. The orchestrator
-   * frees the device when no traffic crosses the connection for this window.
-   * Omit to use the orchestrator default (`ORCH_SESSION_IDLE_TIMEOUT`, 10 minutes);
-   * `0` disables the idle timeout for this session. Must be a non-negative integer.
+   * Idle timeout in milliseconds for this remote device session. Omit this
+   * value to use the service default. `0` disables this timeout. The value
+   * must be a non-negative integer.
    */
   idleTimeoutMs?: number;
 }
 
 /** Worker-scoped options added by this library. */
 export interface MobileWorkerOptions {
-  /** Desired capabilities; selects the platform driver and pool-matches a device. */
+  /** Desired capabilities that select the platform and remote device. */
   capabilities: Capabilities;
 }
 
@@ -235,7 +233,7 @@ export type IOSTestOptions = MobileTestOptions;
  */
 type MobilePlaywrightWorkerArgs = Omit<PlaywrightWorkerArgs, 'browser'> & {
   /**
-   * The worker's browser connection. iOS gives the bridge WebKit `Browser`; a
+   * The worker's browser connection. Remote iOS gives a WebKit `Browser`; a
    * local pre-flight run gives the launched `Browser`. Reading it throws on an
    * Android device run, where the connection is an `AndroidDevice` — use
    * `context` / `page` there.
@@ -245,7 +243,7 @@ type MobilePlaywrightWorkerArgs = Omit<PlaywrightWorkerArgs, 'browser'> & {
 
 /**
  * Cross-platform Playwright `test`. The platform is chosen from
- * `capabilities.platformName` (`'iOS'` -> Safari bridge, `'Android'` -> Chrome).
+ * `capabilities.platformName` (`'iOS'` -> Safari, `'Android'` -> Chrome).
  * `page.bridge` exists on both platforms with a per-platform op set; the
  * iOS-only extras (`page.appium`, `page.setBrowsingMode`, `reopenInMode`) are
  * no-ops / unavailable on Android.
@@ -328,7 +326,7 @@ type BridgeApi = IOSBridgeKnownOps & AndroidBridgeKnownOps & {
 
 declare module '@playwright/test' {
   interface PlaywrightWorkerOptions {
-    /** Desired capabilities; selects the platform driver and pool-matches a device. */
+    /** Desired capabilities that select the platform and remote device. */
     capabilities: Capabilities;
   }
 

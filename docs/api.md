@@ -58,13 +58,12 @@ header), neither of which surfaces native UI on Android Chrome. What Playwright
 cannot see is UI drawn *outside* the web contents: the Android permission sheet,
 the download bar, intent choosers, and the soft keyboard.
 
-The `device` fixture exposes the `AndroidDevice` the context was launched from,
-which is Playwright's own UIAutomator-over-adb surface. It works the same on a
-farm run and on an ADB run, because the calls are dispatched to whichever process
-owns adb. Selector-based methods (`tap`, `longTap`, `fill`, `press`, `wait`,
-`info`, `scroll`, `swipe`, `fling`, `pinchOpen`, `pinchClose`) take an
-`AndroidSelector`. `device.input.*` covers raw coordinates, and `device.shell()`
-runs an adb shell command.
+The `device` fixture exposes the `AndroidDevice` for the current context. It
+supports remote device runs and direct Android Debug Bridge (ADB) runs.
+Selector-based methods (`tap`, `longTap`, `fill`, `press`, `wait`, `info`,
+`scroll`, `swipe`, `fling`, `pinchOpen`, `pinchClose`) take an
+`AndroidSelector`. `device.input.*` uses raw coordinates. `device.shell()` runs
+an ADB shell command.
 
 ```js
 test('accepts the native location prompt', async ({ page, device }) => {
@@ -93,10 +92,6 @@ the tap racy.
 `device.close()` and `device.launchBrowser()` throw: the worker connection and the
 `context` fixture own them, and calling either from a test would break the rest of
 the worker.
-
-Device calls are reported as fixture-kind actions, so they appear in the Zebrunner
-step log when `REPORTING_LOGS_INCLUDE_FIXTURES=true`. Text passed to `device.fill()`
-and `device.input.type()` is redacted there, as it is for the iOS native equivalents.
 
 For ordinary iOS interaction, prefer awaited locator `tap()` calls. Use
 `locator.appium.tap()` only when trusted physical input is required:

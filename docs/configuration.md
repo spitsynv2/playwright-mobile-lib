@@ -8,15 +8,15 @@ no environment-variable fallbacks for device capabilities.
 | Capability | Type | Meaning |
 | --- | --- | --- |
 | `platformName` | `'iOS' \| 'Android'` | Required. Selects the platform driver and route. |
-| `deviceName` | `string` | Device pool pin, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). Required for Android farm runs. For iOS farm runs, provide `deviceName` and/or `deviceUuid`. Also selects the local emulation preset when set. |
-| `deviceUuid` | `string` | iOS device UDID pool pin (case-insensitive). Alone is enough for an iOS farm run. With `deviceName` both must resolve to the same device. |
+| `deviceName` | `string` | Remote device selector, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). Required for remote Android runs. For remote iOS runs, provide `deviceName`, `deviceUuid`, or both. Also selects the local emulation preset when set. |
+| `deviceUuid` | `string` | iOS Unique Device Identifier (UDID) selector. The value is not case-sensitive. With `deviceName`, both values must identify the same device. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
 | `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled. Enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
-| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Per-container verbosity. iOS uses all three sources and restarts a warm container when the set changes. Android forwards `bridge` and `pwserver` when starting its container. `inspector` is iOS-only. The Go bridge and Playwright server implement `off`/`info`/`debug`/`trace`. The iOS container normalizes inspector aliases `fatal`/`warn` to Uvicorn's `critical`/`warning`. |
+| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Remote session log levels. iOS accepts all three sources. Android accepts `bridge` and `pwserver`. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
 reuses one tab for the whole run instead of opening a tab per page. iOS honors
@@ -31,9 +31,8 @@ test, so no tab can span a run. A single-tab request there runs as `public` or
 `browsingMode: process.env.BROWSING_MODE || 'private'` needs no cast. The
 library accepts `public`, `private`, `single-tab-public`,
 `single-tab-private`, and the legacy `single-tab` alias, ignoring surrounding
-case and whitespace during validation. Any other non-empty value throws when
-session setup starts, before the orchestrator or Android launcher can silently
-fall back to its default mode.
+case and whitespace during validation. Any other non-empty value throws during
+session setup.
 
 On Android, `capabilities` also accepts the context options the launched Chrome
 honors (`viewport`, `locale`, `timezoneId`, `geolocation`, `permissions`,
@@ -64,7 +63,7 @@ Only three cannot be applied:
 | --- | --- |
 | `storageState` | `launchBrowser()` does not take it. Restore the cookies yourself with `context.addCookies()`, which Android allows in `public` browsing mode. |
 | `clientCertificates` | `launchBrowser()` does not take them. |
-| `video` | The farm records the session video. Use `extraContextOptions.recordVideo` for a per-context recording. |
+| `video` | Use `extraContextOptions.recordVideo` for a context recording. |
 
 One caveat applies to the `private` browsing modes. Chrome for Android serves the
 incognito tab from a separate profile, but CDP applies `context.grantPermissions()`,
@@ -74,8 +73,8 @@ Per-page settings — `setGeolocation()`, `setExtraHTTPHeaders()`, `setOffline()
 and user-agent updates — apply to the tab directly and work in either mode. Run
 tests that depend on permissions or cookies with `browsingMode: 'public'`.
 
-**iOS Safari honors far fewer**, because the bridge cannot fake a physical
-device's profile or system settings:
+**iOS Safari honors fewer options** because a test cannot replace a physical
+device profile or its system settings:
 
 | Ignored on iOS | Instead |
 | --- | --- |
@@ -86,13 +85,13 @@ device's profile or system settings:
 | `storageState` | Sign in through the UI or inject a token. The cookie jar is shared. |
 | `httpCredentials` | Send `extraHTTPHeaders: { Authorization: 'Basic <base64>' }` for preemptive Basic auth. |
 | `proxy`, `ignoreHTTPSErrors`, `javaScriptEnabled`, `bypassCSP`, `acceptDownloads` | Not available: Safari and iOS own these. |
-| `video` | The farm records the session video. |
+| `video` | Use the remote session video when the service provides it. |
 
-On both platforms the launch-level options cannot apply, because the farm owns
-browser selection and startup: `browserName`, `defaultBrowserType`, `headless`,
-`channel`, `launchOptions`, and `connectOptions`. Use `capabilities.platformName`
-to pick the platform, `capabilities.args` for Android browser flags, and
-`PWM_ORCHESTRATOR` for the connection.
+On remote devices, these launch options do not apply: `browserName`,
+`defaultBrowserType`, `headless`, `channel`, `launchOptions`, and
+`connectOptions`. Use `capabilities.platformName` to select the platform. Use
+`capabilities.args` for Android browser flags. Use `PWM_ORCHESTRATOR` for the
+connection.
 
 Runner-side `trace`, `screenshot`, `testIdAttribute`, `actionTimeout`, and
 `navigationTimeout` remain available on both platforms. Ordinary `use` context
@@ -123,9 +122,9 @@ request while a mid-test resize is not.
 ## Environment variables
 
 The library reads `process.env` and does not load `.env` files itself. Load them
-in the consuming project before importing `playwright-mobile-lib`, because
-connection paths, timeouts, reporting, and ADB settings are captured during
-module initialization. For example:
+in the consuming project before importing `playwright-mobile-lib`. Connection
+paths, timeouts, and ADB settings load during module initialization. For
+example:
 
 ```js
 require('dotenv').config();
@@ -149,15 +148,12 @@ const { test, expect } = require('playwright-mobile-lib');
 | `PWM_ANDROID_ADB` | Set exactly to `true` to select a direct ADB device without a serial. Exactly one device must be available. |
 | `ADB_SERVER_HOST` / `ADB_SERVER_PORT` | Direct-ADB server address. Defaults to `127.0.0.1:5037`. |
 | `ANDROID_OMIT_DRIVER_INSTALL` | Set exactly to `true` to skip Playwright's Android driver installation in direct-ADB mode. |
-| `REPORTING_ENABLED` | Set exactly to `true` to enable the optional Zebrunner integration. Defaults to disabled. |
 
-Authentication is intended for an orchestrator behind an auth proxy, such as the
-TLS + basic-auth nginx sidecar shipped with `playwright-mobile-orchestrator`.
-The `Authorization` value is sent as a Playwright connect header on both
-platforms. Credentials never reach the endpoint URL Playwright connects to.
-Precedence is `PWM_AUTH_HEADER`, then `PWM_AUTH_TOKEN` as `Bearer <token>`, then
-`PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` as HTTP Basic, then userinfo in the
-endpoint URL.
+Use the authentication variables when the remote service requires an
+`Authorization` header. The library sends this header on both platforms. The
+library removes credentials from the endpoint URL before the connection.
+Precedence is `PWM_AUTH_HEADER`, `PWM_AUTH_TOKEN`, `PWM_AUTH_USER` with
+`PWM_AUTH_PASSWORD`, and then userinfo in the endpoint URL.
 
 Userinfo is the shorthand form of the same Basic credentials:
 
