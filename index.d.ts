@@ -166,9 +166,9 @@ export interface Capabilities extends AndroidLaunchCapabilities {
    * so this is the only way to reclaim them — at the cost of the whole profile.
    */
   resetBrowserData?: GateFlag;
-  /** iOS: bridge nav-kick retry gate. */
+  /** iOS: bridge nav-kick retry gate. Defaults to disabled. */
   navKickEnabled?: GateFlag;
-  /** iOS: bridge click-nav retry gate. */
+  /** iOS: bridge click-nav retry gate. Defaults to disabled. */
   clickNavRetriesEnabled?: GateFlag;
   /** Remote session log levels. Android uses `bridge` and `pwserver`. `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;

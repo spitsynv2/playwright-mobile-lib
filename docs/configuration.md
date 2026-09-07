@@ -14,8 +14,8 @@ no environment-variable fallbacks for device capabilities.
 | `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
 | `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled. Enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
-| `navKickEnabled` | `boolean` | iOS only: navigation retry gate. |
-| `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. |
+| `navKickEnabled` | `boolean` | iOS only: navigation retry gate. Defaults to disabled. |
+| `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. Defaults to disabled. |
 | `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Remote session log levels. iOS accepts all three sources. Android accepts `bridge` and `pwserver`. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
