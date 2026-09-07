@@ -139,11 +139,11 @@ type AndroidLaunchCapabilities = Pick<
 export interface Capabilities extends AndroidLaunchCapabilities {
   /** Selects the platform. Required. */
   platformName: 'iOS' | 'Android';
-  /** Remote device selector (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Spaces, underscores, hyphens, and case are interchangeable. For remote iOS runs, provide this value, `deviceUuid`, or both. */
+  /** Remote device selector (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Spaces, underscores, hyphens, and case are interchangeable. For a remote run, provide this value, `deviceUuid`, or both. */
   deviceName?: IOSDeviceName;
-  /** iOS device UDID selector. For remote iOS runs, provide this value, `deviceName`, or both. */
+  /** Remote device UUID selector: the UDID on iOS and the ADB serial on Android. For a remote run, provide this value, `deviceName`, or both. */
   deviceUuid?: string;
-  /** Android device serial for direct-ADB selection (or set `ANDROID_SERIAL`). */
+  /** Android device serial for direct-ADB selection (or set `ANDROID_SERIAL`). For a farm run, select the device with `deviceUuid` instead. */
   serial?: string;
   /**
    * Tab/browsing mode. Full parity on iOS; documented subset on Android.

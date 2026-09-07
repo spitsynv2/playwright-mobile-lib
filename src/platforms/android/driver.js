@@ -352,12 +352,14 @@ const driver = {
     } catch {}
   },
 
+  // Farm runs need a pool filter: deviceName and/or deviceUuid (the ADB serial on
+  // Android). A local Chromium pre-flight has no device pool, so both are optional.
   resolveDeviceInfo(capabilities) {
     const caps = effectiveCapabilities(capabilities);
-    if (resolveWsEndpoint('Android') && !caps.deviceName) {
+    if (resolveWsEndpoint('Android') && !caps.deviceName && !caps.deviceUuid) {
       throw new Error(
-        'capabilities.deviceName is required for Android device runs — '
-        + 'set it in the project capabilities (playwright.config.js).',
+        'capabilities.deviceName or capabilities.deviceUuid is required for Android device '
+        + 'runs — set one (or both) in the project capabilities (playwright.config.js).',
       );
     }
     return {
