@@ -13,7 +13,7 @@ const {
   connectTimeoutMs,
   slowMoMs,
 } = require('../../core/capabilities');
-const { findByNormalizedDeviceName } = require('../../core/device-name');
+const { resolveAndroidDevicePreset: resolveCustomAndroidPreset } = require('./custom-devices');
 const { defineThrowing } = require('../../core/unsupported');
 const { patchContextNewPage, patchContextClose } = require('../../core/context-patch');
 const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
@@ -227,13 +227,13 @@ function buildLaunchBrowserOptions(caps) {
   return opts;
 }
 
-// Playwright device preset for local Chromium emulation, resolved from the caps
-// device name (spaces, underscores, hyphens, and case are interchangeable).
-// Falls back to a mobile default so a local run always emulates a phone viewport.
+// Device preset for local Chromium emulation, resolved from the caps device name
+// (custom-devices.json first, then Playwright's built-ins; separators and case are
+// interchangeable). Falls back to a mobile default so a local run always emulates a phone.
 function resolveAndroidDevicePreset(deviceName) {
-  const match = findByNormalizedDeviceName(devices, deviceName);
-  if (match) return match;
-  return devices[DEFAULT_LOCAL_ANDROID_DEVICE] || {};
+  return resolveCustomAndroidPreset(deviceName, devices)
+    || devices[DEFAULT_LOCAL_ANDROID_DEVICE]
+    || {};
 }
 
 // ADB is used only when explicitly requested (a serial pins a connected device).

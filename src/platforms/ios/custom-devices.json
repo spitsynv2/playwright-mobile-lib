@@ -1,0 +1,24 @@
+{
+  "devices": {
+    "iPhone 16": {
+      "extends": "iPhone 15",
+      "iosVersion": "26.4",
+      "aliases": ["iphone 16"]
+    },
+    "iPhone 16 landscape": {
+      "extends": "iPhone 15 landscape",
+      "iosVersion": "26.4"
+    },
+    "iPhone 16 Plus": {
+      "extends": "iPhone 15 Plus",
+      "iosVersion": "26.4"
+    },
+    "iPhone 16 Plus landscape": {
+      "extends": "iPhone 15 Plus landscape",
+      "iosVersion": "26.4"
+    },
+    "iPhone XR": {
+      "aliases": ["iphone xr", "xr"]
+    }
+  }
+}
