@@ -12,6 +12,7 @@ const {
 } = require('../../core/capabilities');
 const { resolveAndroidDevicePreset: resolveCustomAndroidPreset } = require('./custom-devices');
 const { patchContextNewPage, patchContextClose } = require('../../core/context-patch');
+const { preflightVideoOptions, installPreflightVideoCapture } = require('../../core/preflight-video');
 const { UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
 const { ensureAndroidPrototypesPatched } = require('./bridge-proxy');
 const { makeDeviceProxy } = require('./device-proxy');
@@ -360,7 +361,7 @@ const driver = {
     return makeDeviceProxy(connection);
   },
 
-  async createContext(connection, { preset, extraContextOptions, capabilities, useOptions }) {
+  async createContext(connection, { preset, extraContextOptions, capabilities, useOptions, testInfo }) {
     const caps = effectiveCapabilities(capabilities);
     const mode = normalizeBrowsingMode(caps.browsingMode);
     if (typeof connection.launchBrowser === 'function') {
@@ -398,8 +399,14 @@ const driver = {
       }
       return context;
     }
-    const context = await connection.newContext({ ...preset, ...extraContextOptions });
+    const video = preflightVideoOptions('Android', useOptions, extraContextOptions, testInfo);
+    const context = await connection.newContext({
+      ...preset,
+      ...(video ? { recordVideo: video.recordVideo } : {}),
+      ...extraContextOptions,
+    });
     patchContextNewPage(context, ensureAndroidPrototypesPatched);
+    if (video) installPreflightVideoCapture(context, testInfo, video.mode);
     return context;
   },
 

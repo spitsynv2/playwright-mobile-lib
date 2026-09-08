@@ -94,3 +94,21 @@ PWM_ORCHESTRATOR=wss://orchestrator.example.com:7465/sessions \
 Both projects use the same session URL. The value of
 `capabilities.platformName` selects the platform. A full `IOS_WS_ENDPOINT` or
 `ANDROID_WS_ENDPOINT` overrides the URL for that platform.
+
+## Video on a pre-flight
+
+A local pre-flight honors `use.video`. The launched WebKit or Chromium records
+the page, and the library saves the `video.webm` and attaches it to the test
+result. `video: 'on'`, `'retain-on-failure'`, and `'on-first-retry'` all work.
+
+```ts
+export default defineConfig({
+  use: { video: 'retain-on-failure' },
+});
+```
+
+A device run ignores `use.video` and uses the farm session video instead, so the
+warning about an unsupported `use.video` still prints to predict that device
+behavior. To pick the recording directory or size on a pre-flight, or to record
+on a device context that allows it, pass `extraContextOptions.recordVideo`; an
+explicit `recordVideo` turns off the automatic `use.video` capture.

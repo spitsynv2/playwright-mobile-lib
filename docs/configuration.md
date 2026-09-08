@@ -64,7 +64,7 @@ Only three cannot be applied:
 | --- | --- |
 | `storageState` | `launchBrowser()` does not take it. Restore the cookies yourself with `context.addCookies()`, which Android allows in `public` browsing mode. |
 | `clientCertificates` | `launchBrowser()` does not take them. |
-| `video` | Use `extraContextOptions.recordVideo` for a context recording. |
+| `video` | The farm records the device session. A local pre-flight records `use.video`; for a device context that allows it, use `extraContextOptions.recordVideo`. |
 
 One caveat applies to the `private` browsing modes. Chrome for Android serves the
 incognito tab from a separate profile, but CDP applies `context.grantPermissions()`,
@@ -86,7 +86,7 @@ device profile or its system settings:
 | `storageState` | Sign in through the UI or inject a token. The cookie jar is shared. |
 | `httpCredentials` | Send `extraHTTPHeaders: { Authorization: 'Basic <base64>' }` for preemptive Basic auth. |
 | `proxy`, `ignoreHTTPSErrors`, `javaScriptEnabled`, `bypassCSP`, `acceptDownloads` | Not available: Safari and iOS own these. |
-| `video` | Use the remote session video when the service provides it. |
+| `video` | Use the remote session video when the service provides it. A local pre-flight records `use.video`. |
 
 On remote devices, these launch options do not apply: `browserName`,
 `defaultBrowserType`, `headless`, `channel`, `launchOptions`, and

@@ -56,6 +56,7 @@ const test = base.extend({
       extraContextOptions,
       capabilities,
       useOptions,
+      testInfo,
     });
     try {
       await use(context);

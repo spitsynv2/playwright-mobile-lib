@@ -16,6 +16,7 @@ const {
 } = require('../../core/capabilities');
 const { blockUnsupportedContextAPIs } = require('../../core/unsupported');
 const { patchContextNewPage } = require('../../core/context-patch');
+const { preflightVideoOptions, installPreflightVideoCapture } = require('../../core/preflight-video');
 const { UNSUPPORTED_CONTEXT_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-ios');
 const { ensureAppiumPrototypesPatched } = require('./bridge-proxy');
 const { recordAction } = require('../../core/telemetry');
@@ -92,10 +93,16 @@ const driver = {
     );
   },
 
-  async createContext(browser, { preset, extraContextOptions }) {
-    const context = await browser.newContext({ ...preset, ...extraContextOptions });
+  async createContext(browser, { preset, extraContextOptions, useOptions, testInfo }) {
+    const video = preflightVideoOptions('iOS', useOptions, extraContextOptions, testInfo);
+    const context = await browser.newContext({
+      ...preset,
+      ...(video ? { recordVideo: video.recordVideo } : {}),
+      ...extraContextOptions,
+    });
     blockUnsupportedContextAPIs(context, UNSUPPORTED_CONTEXT_METHODS);
     patchContextNewPage(context, ensureAppiumPrototypesPatched);
+    if (video) installPreflightVideoCapture(context, testInfo, video.mode);
     return context;
   },
 
