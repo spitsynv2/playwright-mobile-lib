@@ -1,8 +1,6 @@
-// page.bridge.<op> proxy + one-time prototype patching that wires page.appium,
-// page.bridge, page.setBrowsingMode, and the unsupported-API throwers onto the
-// Playwright Page/Locator/Mouse/Context prototypes.
+/** Proxies `page.bridge` calls and patches Page, Locator, and Mouse prototypes. */
 const { bridgeCall, makeAppiumProxy, withHitTestBypass } = require('./appium');
-const { resolveWsEndpoint } = require('../../core/capabilities');
+const { hasFarmBridge } = require('../../core/bridge-rpc');
 const { installForegroundScreenshotGate } = require('./screenshot-gate');
 const { recordAction } = require('../../core/telemetry');
 const { defineThrowing, defineCaveatWarning } = require('../../core/unsupported');
@@ -13,16 +11,10 @@ const {
   ADDINITSCRIPT_CROSS_ORIGIN_CAVEAT,
 } = require('./unsupported-ios');
 
-// Ops that leave the calling page's WebInspector WS dead (iOS Settings UI
-// path terminates Safari's WebContent process). After such an op, any
-// further command on the same page would sit on a dead pipe and time out
-// (including the fixture's teardown goto about:blank). We close the page
-// so teardown's live-page reset skips it and the next test gets a
-// fresh context cleanly.
+// These ops kill the tab WebContent process. Close the page after the call.
 const PAGE_INVALIDATING_OPS = new Set(['clearSafariHistory']);
 
-// A page-invalidating op kills the tab's WebContent process. The bridge acks
-// before Settings runs, but a close error is still treated as success.
+// The bridge can ack before Settings closes the tab. Treat a close error as success.
 const TARGET_CLOSED_ERROR = /Target (page, context or browser has been|closed)|has been closed/i;
 const WRAPPED_METHOD = Symbol('playwright-mobile-lib.wrapped-method');
 const patchedPagePrototypes = new WeakSet();
@@ -34,9 +26,9 @@ async function closeInvalidatedPage(page) {
   } catch {}
 }
 
-// page.bridge.<op>(args?) forwards to the bridge's in-process op handler.
-// Any op added in internal/handlers/bridge_call.go is auto-callable here —
-// no per-op wiring needed in the fixture.
+/**
+ * Forwards `page.bridge.<op>` to the bridge. A new bridge op is callable here.
+ */
 function makeBridgeProxy(page) {
   return new Proxy({}, {
     get(_, prop) {
@@ -59,8 +51,6 @@ function makeBridgeProxy(page) {
   });
 }
 
-// Forced pointer actions temporarily bypass the bridge's hit-test block.
-// The options object is last for both Page and Locator signatures.
 const FORCE_CAPABLE_METHODS = ['click', 'dblclick', 'hover', 'tap', 'check', 'uncheck', 'setChecked'];
 const NAVIGATION_METHODS = ['goto', 'reload', 'goBack', 'goForward'];
 
@@ -86,6 +76,7 @@ function wrapForceCapableMethods(proto, resolvePage) {
     const original = proto[name];
     if (typeof original !== 'function' || original[WRAPPED_METHOD]) continue;
     const wrapped = function (...args) {
+      // The options object is last for Page and Locator signatures.
       const opts = args[args.length - 1];
       const force = opts && typeof opts === 'object' && opts.force === true;
       if (!force) return original.apply(this, args);
@@ -100,29 +91,27 @@ function wrapForceCapableMethods(proto, resolvePage) {
   }
 }
 
-// Patched once per worker. Probes a real Page/Locator instance to grab
-// their prototypes; the descriptor is reused by every later page +
-// every locator drilled from any chain (locator.first()/.locator()/etc.).
+/**
+ * Patches Page and Locator prototypes once per worker from a live page.
+ */
 function ensureAppiumPrototypesPatched(probePage) {
   const PageProto = Object.getPrototypeOf(probePage);
   if (patchedPagePrototypes.has(PageProto)) return;
-  // On a local pre-flight (no farm endpoint) there is no bridge to flip input
-  // mode, so forward appium.* as normal Playwright actions instead of failing.
   Object.defineProperty(PageProto, 'appium', {
     configurable: true,
-    get() { return makeAppiumProxy(this, this, 'page.appium', { flip: !!resolveWsEndpoint('iOS') }); },
+    get() { return makeAppiumProxy(this, this, 'page.appium'); },
   });
   Object.defineProperty(PageProto, 'bridge', {
     configurable: true,
     get() { return makeBridgeProxy(this); },
   });
-  // Switching tab groups spawns a fresh Safari tab the bridge adopts as a new
-  // page; the switch can stale this page, so callers use the returned one.
+  // `setBrowsingMode` can stale this page. Use the returned page.
   Object.defineProperty(PageProto, 'setBrowsingMode', {
     configurable: true,
     writable: true,
     value: function (mode, options = {}) {
       return recordAction('fixture', 'page.setBrowsingMode', { mode, options }, async () => {
+        if (!hasFarmBridge('iOS')) return this;
         const timeout = options.timeout ?? 60_000;
         const [newPage] = await Promise.all([
           this.context().waitForEvent('page', { timeout }),
@@ -148,7 +137,7 @@ function ensureAppiumPrototypesPatched(probePage) {
   const LocatorProto = Object.getPrototypeOf(probeLocator);
   Object.defineProperty(LocatorProto, 'appium', {
     configurable: true,
-    get() { return makeAppiumProxy(this, this.page(), 'locator.appium', { flip: !!resolveWsEndpoint('iOS') }); },
+    get() { return makeAppiumProxy(this, this.page(), 'locator.appium'); },
   });
   wrapForceCapableMethods(LocatorProto, (locator) => locator.page());
   defineThrowing(LocatorProto, 'Locator', UNSUPPORTED_LOCATOR_METHODS);

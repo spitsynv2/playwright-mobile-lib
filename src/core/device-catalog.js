@@ -1,13 +1,4 @@
-// Shared custom-device catalog. Definitions load from a per-platform JSON file so
-// a new device (e.g. one newer than this Playwright build ships) is one JSON edit
-// in a commit — no code change, no Playwright bump. Each JSON entry accepts:
-//   extends    base Playwright preset name to inherit (viewport, userAgent, ...).
-//   override   partial device descriptor merged over the base, or the whole
-//              descriptor when `extends` is omitted (viewport {width,height},
-//              screen {width,height}, deviceScaleFactor, userAgent, isMobile,
-//              hasTouch, defaultBrowserType).
-//   <version>  optional OS version reported to Zebrunner (key set by the caller).
-//   aliases    alternate spellings, matched case/separator-insensitively.
+/** Load a custom device catalog from a per-platform JSON file. */
 const {
   normalizeDeviceName,
   findByNormalizedDeviceName,
@@ -40,7 +31,10 @@ function mergePreset(basePreset, overridePreset = {}) {
   return preset;
 }
 
-// buildCatalog derives the alias, version, and definition maps from a JSON `{ devices }` config.
+/**
+ * Build alias, version, and definition maps from a JSON devices config.
+ * An entry can set extends, override, aliases, and an OS version key.
+ */
 function buildCatalog(config, versionKey) {
   const entries = (config && config.devices) || {};
   const aliases = {};
@@ -63,7 +57,7 @@ function buildCustomDevices(playwrightDevices, definitions) {
   const custom = {};
   for (const [deviceName, definition] of Object.entries(definitions)) {
     const basePreset = definition.extends ? playwrightDevices[definition.extends] : null;
-    // A named `extends` that Playwright does not ship is skipped, not silently empty.
+    // Skip a named extends value that Playwright does not ship. Do not emit an empty preset.
     if (definition.extends && !basePreset) continue;
     custom[deviceName] = basePreset
       ? mergePreset(basePreset, definition.override)
@@ -72,7 +66,7 @@ function buildCustomDevices(playwrightDevices, definitions) {
   return custom;
 }
 
-// getDeviceCatalog overlays the JSON-defined devices onto Playwright's built-in presets.
+/** Overlay JSON device definitions on Playwright presets. */
 function getDeviceCatalog(playwrightDevices, definitions) {
   return {
     ...playwrightDevices,
@@ -80,7 +74,7 @@ function getDeviceCatalog(playwrightDevices, definitions) {
   };
 }
 
-// resolvePreset returns the device descriptor for deviceName, honoring aliases and custom devices.
+/** Return the device descriptor for deviceName. Use aliases and custom devices. */
 function resolvePreset(deviceName, playwrightDevices, catalog) {
   const merged = getDeviceCatalog(playwrightDevices, catalog.definitions);
   const alias = catalog.aliases[normalizeDeviceName(deviceName)];
@@ -99,7 +93,7 @@ function resolveCanonicalName(deviceName, catalog) {
   return String(deviceName || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// resolveVersion returns the OS version mapped to deviceName, or null when unmapped.
+/** Return the OS version for deviceName, or null. */
 function resolveVersion(deviceName, catalog) {
   const key = resolveCanonicalName(deviceName, catalog);
   return catalog.versions[key]

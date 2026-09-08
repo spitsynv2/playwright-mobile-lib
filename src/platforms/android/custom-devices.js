@@ -1,12 +1,13 @@
-// Android custom device catalog. Definitions live in custom-devices.json so a new
-// device (e.g. a phone newer than this Playwright build ships a preset for) is one
-// JSON edit in a commit — no code change. See core/device-catalog.js for the entry
-// format. Returns null for an unknown device so the driver can fall back locally.
+/** Android custom device catalog from custom-devices.json. */
 const catalogConfig = require('./custom-devices.json');
 const { buildCatalog, resolvePreset } = require('../../core/device-catalog');
 
 const catalog = buildCatalog(catalogConfig, 'androidVersion');
 
+/**
+ * Resolves an Android device preset from the custom catalog or Playwright devices.
+ * @returns {object|null} Device preset, or null if the device is unknown.
+ */
 function resolveAndroidDevicePreset(deviceName, playwrightDevices) {
   return resolvePreset(deviceName, playwrightDevices, catalog);
 }

@@ -1,6 +1,4 @@
-// Instance-level newPage wrap so pages a consumer opens off the fixture context
-// get the same prototype patches (bridge/appium/guards) that createPage applies.
-
+/** Patch context.newPage. A consumer page must get the same prototype patches. */
 function patchContextNewPage(context, ensurePatched) {
   if (typeof context.newPage !== 'function') return;
   const original = context.newPage.bind(context);
@@ -11,8 +9,7 @@ function patchContextNewPage(context, ensurePatched) {
   };
 }
 
-// A test that closes the context itself runs before the fixture's teardown hook,
-// which then sees an empty page list; wrapping close is the only pre-close point.
+/** Run cleanup before context.close when a test closes the context. */
 function patchContextClose(context, beforeClose) {
   if (typeof context.close !== 'function') return;
   const original = context.close.bind(context);

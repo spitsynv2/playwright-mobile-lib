@@ -1,6 +1,4 @@
-// Device-name folding shared by farm matching helpers and local presets.
-// Spaces, underscores, and hyphens are the same separator; case is ignored.
-
+/** Fold device names. Spaces, underscores, and hyphens match as one separator. */
 function normalizeDeviceName(deviceName) {
   return String(deviceName || '')
     .replace(/[_-]+/g, ' ')
@@ -9,6 +7,7 @@ function normalizeDeviceName(deviceName) {
     .toLowerCase();
 }
 
+/** Return a catalog value whose folded name matches deviceName. */
 function findByNormalizedDeviceName(catalog, deviceName) {
   const requested = normalizeDeviceName(deviceName);
   if (!requested || !catalog) return undefined;

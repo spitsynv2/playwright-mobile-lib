@@ -1,12 +1,5 @@
-// iOS Safari restriction tables. Only hard iOS limits are blocked. Implementation-in-progress
-// gaps (clock, console/pageerror, evaluateHandle, exposeFunction, tracing, recordVideo,
-// route/waitForResponse/networkidle/extraHTTPHeaders, requestGC, worker, accessibility,
-// screenshot{clip}) are NOT blocked — they will become real support. addInitScript ships
-// with a cross-origin after-load caveat warning rather than a block.
+/** Restriction tables for iOS Safari APIs that the physical device cannot honor. */
 
-// BrowserContext methods that cannot work on a shared physical device.
-// Page.setCookie also hard-bricks the WebProcess inspector pump, and the
-// cookie jar is shared across all tests in a worker (no per-test wipe).
 const UNSUPPORTED_CONTEXT_METHODS = {
   cookies: 'shared device cookie jar — no per-context isolation; Page.setCookie bricks the inspector pump',
   addCookies: 'shared device cookie jar — no per-context isolation; Page.setCookie bricks the inspector pump',
@@ -18,7 +11,6 @@ const UNSUPPORTED_CONTEXT_METHODS = {
   setOffline: 'only airplane mode toggles offline, which kills the inspector WebSocket',
 };
 
-// Page methods that silently no-op on the physical device.
 const UNSUPPORTED_PAGE_METHODS = {
   setViewportSize: 'physical device viewport — use device-pool selection instead',
   emulateMedia: 'iOS system-level setting — faked CSS would misreport Safari\'s real layout',
@@ -26,21 +18,17 @@ const UNSUPPORTED_PAGE_METHODS = {
   setInputFiles: 'native file picker is not driveable cleanly on a shared device',
 };
 
-// Locator methods that silently no-op on the physical device.
 const UNSUPPORTED_LOCATOR_METHODS = {
   hover: 'iOS Safari has no hover; touch devices fire pointer events on tap only',
   setInputFiles: 'native file picker is not driveable cleanly on a shared device',
 };
 
-// Mouse methods that have no iOS input modality. Only wheel is blocked;
-// down/move/up still drive the buffer-and-flush click path.
+// This table blocks only `wheel`. `down`, `move`, and `up` still drive the click path.
 const UNSUPPORTED_MOUSE_METHODS = {
   wheel: 'iOS has no wheel/trackpad input modality — scroll via touch (scrollIntoViewIfNeeded / evaluate(scrollBy))',
 };
 
-// Context options that reach newContext() but the bridge or the device cannot
-// honor. Playwright's instrumentation injects `use` into every newContext call,
-// so these arrive silently unless the fixture reports them.
+// Playwright injects `use` into every `newContext` call. The fixture reports these.
 const UNSUPPORTED_USE_OPTIONS = {
   storageState: 'the shared device cookie jar cannot be read or restored — sign in through the UI or inject a token in the test',
   httpCredentials: 'Emulation.setAuthCredentials is a bridge stub — send extraHTTPHeaders: { Authorization } for preemptive Basic auth',
@@ -68,10 +56,7 @@ const UNSUPPORTED_USE_OPTIONS = {
   recordVideo: 'the farm records the session video and attaches it to the report',
 };
 
-// addInitScript works, but iOS Safari drops the before-load bootstrap across a
-// cross-origin process swap (even on a paused provisional target), so the
-// bridge replays the script into the committed document: before-load on
-// same-origin navigations, after-load on the first cross-origin document.
+/** Warning text for `addInitScript` after a cross-origin navigation. */
 const ADDINITSCRIPT_CROSS_ORIGIN_CAVEAT =
   'addInitScript runs before-load only on same-origin navigations; ' +
   'after a cross-origin hop the script is replayed into the committed ' +

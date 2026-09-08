@@ -1,8 +1,4 @@
-// iOS custom device catalog. Definitions live in custom-devices.json so a new
-// device is one JSON edit shipped in a commit — no code change. The extended
-// Playwright presets report an older iOS in their UA, so `iosVersion` is the
-// source of truth for Zebrunner session capabilities. See core/device-catalog.js
-// for the JSON entry format.
+/** iOS custom device catalog with entries from `custom-devices.json`. */
 const catalogConfig = require('./custom-devices.json');
 const {
   buildCatalog,
@@ -11,6 +7,7 @@ const {
   resolveVersion,
 } = require('../../core/device-catalog');
 
+// Playwright presets can report an older iOS in the UA. `iosVersion` is the source of truth.
 const catalog = buildCatalog(catalogConfig, 'iosVersion');
 
 function getIOSDeviceCatalog(playwrightDevices) {

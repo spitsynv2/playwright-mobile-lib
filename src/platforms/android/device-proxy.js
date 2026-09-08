@@ -1,28 +1,27 @@
-// `device.<method>` proxy over the AndroidDevice a farm/ADB run connects as, so
-// UIAutomator + adb work shows up in the reported step list like bridge/appium calls.
+/** AndroidDevice proxy that records UIAutomator and ADB calls as fixture steps. */
 const { recordAction } = require('../../core/telemetry');
 
-// The reporter validates action kinds against a fixed set and logs an error per
-// rejected action; 'fixture' is the only valid kind whose title aliasing cannot
-// suppress an unrelated concurrent Playwright step.
+// Use fixture as the action kind. The reporter rejects other kinds.
 const ACTION_KIND = 'fixture';
 
-// Fixture-owned lifecycle: calling these from a test breaks the rest of the worker.
+// These methods belong to the fixture. A test must not call them.
 const BLOCKED_METHODS = {
   close: 'the connection is worker-scoped and the fixture closes it at teardown',
   launchBrowser: 'the `context` fixture owns the browser context — use `context` / `page`',
 };
 
-// Synchronous members; recording them would hand the caller a promise instead.
+// These members are synchronous. recordAction would return a promise instead.
 const PASSTHROUGH_MEMBERS = new Set([
   'model', 'serial', 'setDefaultTimeout', 'webViews',
   'on', 'once', 'off', 'addListener', 'removeListener', 'prependListener',
 ]);
 
-// Sub-objects that are themselves an API surface. Everything else (channel and
-// connection internals) is handed back untouched.
+// Nested API surfaces. Other members pass through without a proxy.
 const PROXIED_NAMESPACES = new Set(['input']);
 
+/**
+ * Returns a device proxy that records AndroidDevice calls as fixture steps.
+ */
 function makeDeviceProxy(receiver, path = 'device') {
   return new Proxy({}, {
     get(_, prop) {
@@ -34,7 +33,7 @@ function makeDeviceProxy(receiver, path = 'device') {
       }
       const target = receiver[prop];
       if (typeof target === 'function') {
-        // Object.prototype members must stay synchronous or string coercion breaks.
+        // Object.prototype members must stay synchronous. String coercion fails otherwise.
         if (PASSTHROUGH_MEMBERS.has(prop) || Object.prototype[prop] === target) return target.bind(receiver);
         const methodPath = `${path}.${prop}`;
         return (...args) => recordAction(ACTION_KIND, methodPath, { args }, () => target.apply(receiver, args));

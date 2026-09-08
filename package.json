@@ -23,7 +23,7 @@
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "unit": "node --test test/telemetry.test.js test/reporting.test.js test/capabilities.test.js test/device-name.test.js test/use-guard.test.js test/fixture-wiring.test.js test/bundle.test.js test/appium.test.js test/unsupported.test.js test/bridge-proxy-ios.test.js test/bridge-proxy-android.test.js test/ios-driver.test.js test/screenshot-gate.test.js",
+    "unit": "node --test test/telemetry.test.js test/reporting.test.js test/capabilities.test.js test/device-name.test.js test/use-guard.test.js test/fixture-wiring.test.js test/bundle.test.js test/appium.test.js test/unsupported.test.js test/bridge-rpc.test.js test/bridge-proxy-ios.test.js test/bridge-proxy-android.test.js test/ios-driver.test.js test/screenshot-gate.test.js",
     "test": "npm run build && npm run typecheck && node -e \"require('./index.js'); console.log('playwright-mobile-lib loads ok')\" && npm run unit",
     "test:coverage": "c8 --config .c8rc.json npm run unit",
     "test:pack": "node --test test/pack-smoke.test.js"

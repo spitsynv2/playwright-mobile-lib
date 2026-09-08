@@ -1,7 +1,7 @@
-// Warn-once check over the `use.*` options the connected device cannot honor.
-// Local pre-flight runs warn too: pre-flight exists to predict the device run.
+/** Guard for Playwright use options that a device cannot apply. */
+// Warn on a local pre-flight as well. Pre-flight must predict the device run.
 
-// True on both platforms: the farm owns browser selection and launch.
+/** Launch options the farm owns on iOS and Android. */
 const UNSUPPORTED_LAUNCH_OPTIONS = {
   browserName: 'the device browser follows capabilities.platformName',
   defaultBrowserType: 'the device browser follows capabilities.platformName',
@@ -21,6 +21,7 @@ function collect(source, prefix, table, flagged) {
   }
 }
 
+/** Warn once for each use option that a connected device cannot apply. */
 function warnUnsupportedUseOptions(use, unsupportedContextOptions = {}) {
   const flagged = [];
   collect(use, 'use.', { ...UNSUPPORTED_LAUNCH_OPTIONS, ...unsupportedContextOptions }, flagged);

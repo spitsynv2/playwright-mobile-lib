@@ -80,6 +80,7 @@ src/platforms/index.js       selectDriver(platformName)
 
 src/core/
   capabilities.js            Endpoint, auth, timeout, client-id, browsing-mode
+  bridge-rpc.js              Sentinel RPC with a farm-or-pre-flight guard
   device-name.js             Device-name matching across separators and case
   reporting.js               Optional reporting adapter
   telemetry.js               Bounded and redacted action data
@@ -125,6 +126,9 @@ across reconnects.
 `page.bridge.<op>(args?)` calls a supported device operation. Both platforms
 use the same call shape. The available operations depend on the platform.
 
+A local pre-flight has no interceptor. The library throws
+`BridgeUnavailableError`. It does not evaluate the sentinel string.
+
 Some operations invalidate the current page. The library applies the required
 page cleanup and bounded retries.
 
@@ -134,9 +138,11 @@ The driver patches the Playwright `Page`, `Locator`, `Mouse`, and
 `BrowserContext` prototypes once per worker:
 
 - It adds `page.bridge`, `page.appium`, `locator.appium`, and
-  `page.setBrowsingMode` (iOS).
+  `page.setBrowsingMode` (iOS). Android also has `page.appium` /
+  `locator.appium` as a Playwright passthrough.
 - It wraps navigation for optional action integrations.
-- It wraps forced pointer actions for the iOS hit-test bypass.
+- It wraps forced pointer actions for the iOS hit-test bypass. A local
+  pre-flight skips the bypass RPC and uses Playwright `force`.
 - It replaces APIs a shared physical device cannot support with throwers that
   explain the alternative. The type definitions mark these `@deprecated`, so an
   editor shows them struck through before a run.

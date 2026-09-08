@@ -1,5 +1,6 @@
-// Platform driver registry: maps capabilities.platformName to its driver.
+/** Map capabilities.platformName to a platform driver. */
 
+/** Return the driver for platformName. Default is iOS. */
 function selectDriver(platformName) {
   const platform = String(platformName || '').toLowerCase();
   if (platform === 'android') return require('./android/driver');

@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const driver = require('../src/platforms/ios/driver');
+const { withConnectEnv } = require('./helpers/connect-env');
+
+const FARM = { PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' };
 
 const SENTINEL = '__pwm_bridge_call__:';
 
@@ -92,43 +95,48 @@ test('createPage returns the page when the bridge handshake is unavailable', asy
   assert.equal(result, page, 'a missing bridge does not crash the fixture');
 });
 
-test('createPage keeps the current page when reopenInMode cannot reach the bridge', async () => {
-  const page = makeFullPage();
-  const context = { async newPage() { return page; } };
-  const capture = captureWarnings();
-  let result;
-  try {
-    result = await driver.createPage(context, {
-      deviceInfo: { deviceName: '', platformName: 'iOS', osVersion: '' },
-      reopenInMode: 'private',
-      testInfo: {},
-    });
-  } finally {
-    capture.restore();
-  }
+test('createPage keeps the current page when reopenInMode has no farm bridge', async () => {
+  await withConnectEnv({}, async () => {
+    const page = makeFullPage();
+    const context = { async newPage() { return page; } };
+    const capture = captureWarnings();
+    let result;
+    try {
+      result = await driver.createPage(context, {
+        deviceInfo: { deviceName: '', platformName: 'iOS', osVersion: '' },
+        reopenInMode: 'private',
+        testInfo: {},
+      });
+    } finally {
+      capture.restore();
+    }
 
-  assert.equal(result, page, 'the reopen is best-effort and falls back to the current page');
-  assert.ok(
-    capture.warnings.some((line) => /setBrowsingMode\(private\) unavailable/.test(line)),
-    'the fallback is announced',
-  );
+    assert.equal(result, page, 'a local pre-flight keeps the current page');
+    assert.equal(
+      capture.warnings.some((line) => /setBrowsingMode\(private\) unavailable/.test(line)),
+      false,
+      'a missing farm does not warn; setBrowsingMode returns the same page',
+    );
+  });
 });
 
 test('createPage reopens into the tab the bridge adopts when setBrowsingMode succeeds', async () => {
-  const page = makeFullPage({
-    evalImpl(request) {
-      if (request.op === 'getDeviceInfo') return JSON.stringify({ deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '17.0' });
-      if (request.op === 'getSessionId') return 'session-1';
-      return 'ok';
-    },
-  });
-  const context = { async newPage() { return page; } };
+  await withConnectEnv(FARM, async () => {
+    const page = makeFullPage({
+      evalImpl(request) {
+        if (request.op === 'getDeviceInfo') return JSON.stringify({ deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '17.0' });
+        if (request.op === 'getSessionId') return 'session-1';
+        return 'ok';
+      },
+    });
+    const context = { async newPage() { return page; } };
 
-  const result = await driver.createPage(context, {
-    deviceInfo: { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
-    reopenInMode: 'public',
-    testInfo: {},
-  });
+    const result = await driver.createPage(context, {
+      deviceInfo: { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
+      reopenInMode: 'public',
+      testInfo: {},
+    });
 
-  assert.deepEqual(result, { id: 'reopened' }, 'the adopted tab becomes the test page');
+    assert.deepEqual(result, { id: 'reopened' }, 'the adopted tab becomes the test page');
+  });
 });

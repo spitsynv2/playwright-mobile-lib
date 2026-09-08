@@ -1,7 +1,4 @@
-// Android Chrome platform driver. With a farm endpoint it connects to the
-// orchestrator session URL; with an explicit ADB serial it drives a connected
-// device; otherwise it launches a local Chromium with the caps device preset
-// (viewport emulation) for local pre-flight validation.
+/** Android Chrome platform driver. */
 const { _android: android } = require('playwright');
 const { chromium, devices, selectors } = require('@playwright/test');
 
@@ -14,10 +11,9 @@ const {
   slowMoMs,
 } = require('../../core/capabilities');
 const { resolveAndroidDevicePreset: resolveCustomAndroidPreset } = require('./custom-devices');
-const { defineThrowing } = require('../../core/unsupported');
 const { patchContextNewPage, patchContextClose } = require('../../core/context-patch');
-const { UNSUPPORTED_PAGE_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
-const { makeBridgeProxy } = require('./bridge-proxy');
+const { UNSUPPORTED_USE_OPTIONS } = require('./unsupported-android');
+const { ensureAndroidPrototypesPatched } = require('./bridge-proxy');
 const { makeDeviceProxy } = require('./device-proxy');
 const {
   attachSessionCapabilities,
@@ -29,32 +25,25 @@ const adbHost = process.env.ADB_SERVER_HOST || '127.0.0.1';
 const adbPort = parseInt(process.env.ADB_SERVER_PORT || '5037', 10);
 const omitDriverInstall = process.env.ANDROID_OMIT_DRIVER_INSTALL === 'true';
 
-// Fallback preset for local emulation when the caps device is unknown to Playwright.
 const DEFAULT_LOCAL_ANDROID_DEVICE = 'Pixel 7';
 
-// Android defaults to `public` (stable). `private` is experimental because Chrome
-// for Android has no CDP incognito flag, so isolation is best-effort.
 const DEFAULT_ANDROID_BROWSING_MODE = 'public';
 const BROWSING_MODES = new Set(['public', 'private']);
 
-// Chrome is force-stopped and relaunched per test, so no tab can span a run; a
-// single-tab request degrades to its base mode instead of pretending otherwise.
+// Chrome restarts for each test. A single-tab mode maps to its base mode.
 const SINGLE_TAB_BASE_MODES = {
   'single-tab': 'public',
   'single-tab-public': 'public',
   'single-tab-private': 'private',
 };
 
-// Prepended to launchBrowser args so a relaunched Chrome does not restore the
-// previous test's growing tab set (support varies by Chrome build).
+// Chrome can restore tabs from the previous test.
 const SESSION_RESTORE_DISABLE_ARGS = [
   '--disable-restore-session-state',
   '--no-restore-session-state',
 ];
 
-// Chrome sets FLAG_SECURE on incognito windows, which blacks out the farm's screen
-// recording. CDPScreenshotNewSurface is repeated because Playwright emits its own
-// --enable-features before ours and Chrome keeps only the last occurrence.
+// Repeat CDPScreenshotNewSurface. Chrome keeps only the last --enable-features list.
 const SCREEN_CAPTURE_FEATURE_ARGS = [
   '--enable-features=CDPScreenshotNewSurface,IncognitoScreenshot,ImprovedIncognitoScreenshot',
 ];
@@ -79,8 +68,7 @@ function isPrivateMode(mode) {
   return mode === 'private';
 }
 
-// launchBrowser() opens a tab per test (`am start -d about:blank`) and Android
-// context.close() only drops the CDP socket, so nothing but this closes a tab.
+// Android context.close() drops the CDP socket only. A tab stays until this path closes it.
 const DEFAULT_TAB_CLOSE_TIMEOUT_MS = 5_000;
 const LATE_TAB_SETTLE_MS = 250;
 
@@ -98,7 +86,7 @@ function livePages(context) {
   }
 }
 
-// A wedged renderer can hang page.close() forever; teardown budget is shared.
+// A stuck renderer can hang page.close() with no end.
 async function closeTab(page) {
   let timer;
   const closed = Promise.resolve().then(() => page.close()).catch(() => {});
@@ -112,8 +100,7 @@ async function closeTab(page) {
   }
 }
 
-// context.pages() omits targets that are still initializing, so a second pass picks
-// up tabs (mid-flight popups, tabs Chrome restored) that surfaced during the first.
+// context.pages() omits new targets. A second pass finds tabs that appear after the first.
 async function pruneTabs(context, keep) {
   for (let pass = 0; pass < 2; pass++) {
     const doomed = livePages(context).filter((p) => p !== keep);
@@ -131,20 +118,20 @@ async function sweepTabs(context, keep, phase) {
   } catch {}
 }
 
-// The tab launchBrowser() just opened; every other page is one Chrome restored.
+// This is the tab that launchBrowser() opened. Other pages come from Chrome restore.
 function launchPage(context) {
   const pages = livePages(context);
   return pages.find((p) => p.url() === 'about:blank') || pages[0] || null;
 }
 
-// Chrome activity that opens an incognito tab; the only CDP-visible incognito
-// path on Android (there is no launch/newPage incognito flag).
+// Only CDP-visible incognito path on Android. Chrome has no launch incognito flag.
 const INCOGNITO_LAUNCHER = 'org.chromium.chrome.browser.incognito.IncognitoTabLauncher';
 const INCOGNITO_PAGE_TIMEOUT_MS = 10_000;
 
-// Open an incognito tab and adopt it as the context's sole page. Returns the
-// incognito Page, or null when it never surfaced (caller falls back to the
-// normal profile so private mode degrades gracefully instead of failing).
+/**
+ * Opens an incognito tab and keeps it as the only page.
+ * @returns {Promise<object|null>} Incognito page, or null if the tab does not appear.
+ */
 async function openIncognitoPage(connection, context, pkg) {
   const before = new Set(context.pages());
   const arrival = context.waitForEvent('page', { timeout: INCOGNITO_PAGE_TIMEOUT_MS }).catch(() => null);
@@ -156,7 +143,7 @@ async function openIncognitoPage(connection, context, pkg) {
   }
   let incognito = started ? await arrival : null;
   if (!incognito) incognito = context.pages().find((p) => !before.has(p)) || null;
-  // The intent can open a tab even when it reports failure or never surfaces here.
+  // The intent can open a tab even when the start command fails.
   if (!incognito) {
     await pruneTabs(context, [...before][0] || launchPage(context));
     return null;
@@ -165,8 +152,6 @@ async function openIncognitoPage(connection, context, pkg) {
   return incognito;
 }
 
-// launchBrowser() option keys accepted from capabilities (a subset of
-// BrowserContextOptions honored by the _android Chrome context).
 const LAUNCH_BROWSER_KEYS = [
   'acceptDownloads', 'args', 'baseURL', 'bypassCSP',
   'colorScheme', 'contrast', 'deviceScaleFactor',
@@ -179,11 +164,10 @@ const LAUNCH_BROWSER_KEYS = [
   'timezoneId', 'userAgent', 'viewport',
 ];
 
-// `args` and `pkg` are launch-only capabilities, never Playwright `use` options.
+// args and pkg are launch-only. Do not forward them as Playwright use options.
 const FORWARDED_USE_KEYS = LAUNCH_BROWSER_KEYS.filter((key) => key !== 'args' && key !== 'pkg');
 
-// launchBrowser() skips Playwright's runBeforeCreateBrowserContext hook, so the
-// project's `use` options only reach a device context if the driver forwards them.
+// launchBrowser() skips the runBeforeCreateBrowserContext hook. Forward use options here.
 function forwardedUseOptions(useOptions) {
   const use = useOptions || {};
   const opts = {};
@@ -198,8 +182,7 @@ function forwardedUseOptions(useOptions) {
 
 const NO_TIMEOUT = { signal: undefined, timeout: 0 };
 
-// launchBrowser() skips the selector plumbing newContext() gets, so anything
-// registered before the device context existed has to be replayed onto it.
+// launchBrowser() skips selector registration that newContext() applies. Replay engines here.
 async function applyRegisteredSelectors(context) {
   const channel = context._channel;
   if (!channel || typeof channel.registerSelectorEngine !== 'function') return;
@@ -217,8 +200,7 @@ function buildLaunchBrowserOptions(caps) {
   for (const key of LAUNCH_BROWSER_KEYS) {
     if (caps[key] !== undefined) opts[key] = caps[key];
   }
-  // Private isolation is handled post-launch via IncognitoTabLauncher (Chrome for
-  // Android has no CDP incognito flag), not through launch args.
+  // Private mode uses IncognitoTabLauncher after launch, not launch args.
   opts.args = [
     ...SESSION_RESTORE_DISABLE_ARGS,
     ...SCREEN_CAPTURE_FEATURE_ARGS,
@@ -227,17 +209,16 @@ function buildLaunchBrowserOptions(caps) {
   return opts;
 }
 
-// Device preset for local Chromium emulation, resolved from the caps device name
-// (custom-devices.json first, then Playwright's built-ins; separators and case are
-// interchangeable). Falls back to a mobile default so a local run always emulates a phone.
+/**
+ * Resolves the local Chromium device preset from the capability device name.
+ */
 function resolveAndroidDevicePreset(deviceName) {
   return resolveCustomAndroidPreset(deviceName, devices)
     || devices[DEFAULT_LOCAL_ANDROID_DEVICE]
     || {};
 }
 
-// ADB is used only when explicitly requested (a serial pins a connected device).
-// Otherwise a no-endpoint run means local Chromium emulation.
+// Use ADB only when a serial or PWM_ANDROID_ADB is set.
 function useAdb(caps) {
   return Boolean(caps.serial || process.env.ANDROID_SERIAL || process.env.PWM_ANDROID_ADB === 'true');
 }
@@ -271,29 +252,12 @@ async function connectAdb(caps) {
   return list[0];
 }
 
-const patchedAndroidPrototypes = new WeakSet();
-
-function ensureAndroidPrototypesPatched(probePage) {
-  const PageProto = Object.getPrototypeOf(probePage);
-  if (patchedAndroidPrototypes.has(PageProto)) return;
-  defineThrowing(PageProto, 'Page', UNSUPPORTED_PAGE_METHODS);
-  Object.defineProperty(PageProto, 'bridge', {
-    configurable: true,
-    get() { return makeBridgeProxy(this); },
-  });
-  patchedAndroidPrototypes.add(PageProto);
-}
-
-// The Chrome build the launched context runs on, read from the device package
-// manager over adb so Zebrunner reporting shows the real browserVersion.
 const contextBrowserVersion = new WeakMap();
 
-// ArtifactsRecorder scans only chromium/firefox/webkit `_contexts`, so launchBrowser()
-// contexts get no `use.screenshot` capture and newContext() ones must not be captured twice.
+// ArtifactsRecorder skips launchBrowser() contexts. Capture screenshots in onPageTeardown.
 const contextsWithoutArtifactRail = new WeakSet();
 
-// Teardown sweep per device context, shared by the fixture hook and the wrapped
-// context.close(); absent when the run opted out of tab pruning.
+// No sweep is stored when tab prune is off.
 const contextTabSweep = new WeakMap();
 
 const SCREENSHOT_TIMEOUT_MS = 10_000;
@@ -352,8 +316,7 @@ const driver = {
     } catch {}
   },
 
-  // Farm runs need a pool filter: deviceName and/or deviceUuid (the ADB serial on
-  // Android). A local Chromium pre-flight has no device pool, so both are optional.
+  // A farm run requires deviceName or deviceUuid. A local run does not.
   resolveDeviceInfo(capabilities) {
     const caps = effectiveCapabilities(capabilities);
     if (resolveWsEndpoint('Android') && !caps.deviceName && !caps.deviceUuid) {
@@ -373,7 +336,7 @@ const driver = {
     return resolveAndroidDevicePreset(deviceInfo.deviceName);
   },
 
-  // A device run connects as an AndroidDevice; only a local pre-flight run has a Browser.
+  // A device run is an AndroidDevice. Only a local run is a Browser.
   resolveBrowser(connection) {
     if (typeof connection.newContext === 'function') return connection;
     throw new Error(
@@ -384,9 +347,7 @@ const driver = {
     );
   },
 
-  // The same AndroidDevice the context is launched from, exposed for UIAutomator
-  // and adb work that reaches native UI outside the web contents. Only a real
-  // device run has one; local pre-flight Chromium is not backed by a device.
+  // AndroidDevice for native UI and ADB. A local Chromium run has no device.
   resolveDevice(connection) {
     if (typeof connection.launchBrowser !== 'function') {
       throw new Error(
@@ -402,13 +363,11 @@ const driver = {
   async createContext(connection, { preset, extraContextOptions, capabilities, useOptions }) {
     const caps = effectiveCapabilities(capabilities);
     const mode = normalizeBrowsingMode(caps.browsingMode);
-    // A real device (farm or ADB) exposes launchBrowser; local Chromium exposes newContext.
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
       const pruneTabsEnabled = gateFlag(caps.closeTabAfterTest) !== false;
       await connection.shell(`am force-stop ${pkg}`);
-      // Tabs Chrome restores without reloading have no CDP target, so a sweep can
-      // never see them; wiping browser data is the only way to reclaim those.
+      // Restored tabs with no CDP target stay hidden from a sweep. Only pm clear removes them.
       if (gateFlag(caps.resetBrowserData) === true) {
         try {
           await connection.shell(`pm clear ${pkg}`);
@@ -421,7 +380,7 @@ const driver = {
         ...buildLaunchBrowserOptions(caps),
         ...extraContextOptions,
       };
-      // Playwright gates locator.tap/touchscreen on hasTouch; a physical device always has touch.
+      // Playwright gates locator.tap on hasTouch. A physical device always has touch.
       launchOptions.hasTouch = gateFlag(launchOptions.hasTouch) ?? true;
       const context = await connection.launchBrowser(launchOptions);
       await applyRegisteredSelectors(context);
@@ -444,22 +403,19 @@ const driver = {
     return context;
   },
 
-  // Idempotent: a test that closed the context already ran this through the wrap.
+  // Safe to call twice. A closed context already ran this sweep.
   async onContextTeardown(context) {
     const sweep = contextTabSweep.get(context);
     if (sweep) await sweep();
   },
 
   async createPage(context, { deviceInfo, testInfo } = {}) {
-    // launchBrowser() already opened a tab; newPage() here would strand it, and in
-    // private mode it would also land outside the adopted incognito tab.
+    // launchBrowser() already opened a tab. newPage() would leave that tab and miss incognito.
     const existing = typeof context.pages === 'function' ? context.pages() : [];
     const page = existing[0] || await context.newPage();
     ensureAndroidPrototypesPatched(page);
 
-    // Handshake: pull the bridge's per-test session id and device metadata at test
-    // start and push them to Zebrunner. On a local/ADB run (no bridge) the sentinel
-    // evaluate throws and is swallowed, leaving sessionId empty.
+    // A local or ADB run has no bridge. The RPC fails and sessionId stays empty.
     let sessionId = '';
     let resolvedDeviceInfo = deviceInfo || { platformName: 'Android' };
     try {

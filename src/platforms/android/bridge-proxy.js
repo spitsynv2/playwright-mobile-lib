@@ -1,31 +1,20 @@
-// page.bridge.<op> proxy for the Android Chrome bridge. page.evaluate of a
-// sentinel string is intercepted by the Go bridge and routed to its op handler,
-// so any op added in internal/handlers/bridge_call.go is auto-callable here.
+/** Android Chrome page.bridge proxy and Page prototype patches. */
 const { recordAction } = require('../../core/telemetry');
+const { defineThrowing } = require('../../core/unsupported');
+const { BRIDGE_CALL_SENTINEL, bridgeCall: farmBridgeCall } = require('../../core/bridge-rpc');
+const { makeAppiumProxy } = require('../ios/appium');
+const { UNSUPPORTED_PAGE_METHODS } = require('./unsupported-android');
 
-const BRIDGE_CALL_SENTINEL = '__pwm_bridge_call__:';
-
-// A navigation can destroy the main-frame execution context mid-evaluate; the
-// bridge state the sentinel targets survives it, so re-resolve and retry rather
-// than fail. Terminal closes ("Target closed") are not matched and propagate.
-const RETRYABLE_EVAL_ERROR = /Execution context was destroyed|Cannot find context with specified id|Execution context is not available|because of a navigation/i;
-
-async function bridgeCall(page, op, args = {}) {
-  const payload = `${BRIDGE_CALL_SENTINEL}${JSON.stringify({ op, args })}`;
-  let lastErr;
-  for (let attempt = 0; attempt < 10; attempt++) {
-    try {
-      return await page.evaluate(payload);
-    } catch (err) {
-      if (!RETRYABLE_EVAL_ERROR.test(err && err.message ? err.message : String(err))) throw err;
-      lastErr = err;
-      await page.waitForTimeout(100);
-    }
-  }
-  throw lastErr;
+/**
+ * Sends a bridge operation through the shared Android RPC.
+ */
+function bridgeCall(page, op, args = {}) {
+  return farmBridgeCall(page, op, args, 'Android');
 }
 
-// page.bridge.<op>(args?) forwards to the bridge's in-process op handler.
+/**
+ * Returns a page.bridge proxy that sends each call to the Android bridge.
+ */
 function makeBridgeProxy(page) {
   return new Proxy({}, {
     get(_, prop) {
@@ -35,4 +24,39 @@ function makeBridgeProxy(page) {
   });
 }
 
-module.exports = { BRIDGE_CALL_SENTINEL, bridgeCall, makeBridgeProxy };
+const patchedAndroidPrototypes = new WeakSet();
+
+/**
+ * Patches Page and Locator prototypes with Android bridge and Appium accessors.
+ */
+function ensureAndroidPrototypesPatched(probePage) {
+  const PageProto = Object.getPrototypeOf(probePage);
+  if (patchedAndroidPrototypes.has(PageProto)) return;
+  defineThrowing(PageProto, 'Page', UNSUPPORTED_PAGE_METHODS);
+  Object.defineProperty(PageProto, 'bridge', {
+    configurable: true,
+    get() { return makeBridgeProxy(this); },
+  });
+  // Android has no Appium input-mode flip. locator.appium.tap() calls the Playwright action.
+  Object.defineProperty(PageProto, 'appium', {
+    configurable: true,
+    get() { return makeAppiumProxy(this, this, 'page.appium', { flip: false }); },
+  });
+
+  if (typeof probePage.locator === 'function') {
+    const probeLocator = probePage.locator('html');
+    const LocatorProto = Object.getPrototypeOf(probeLocator);
+    Object.defineProperty(LocatorProto, 'appium', {
+      configurable: true,
+      get() { return makeAppiumProxy(this, this.page(), 'locator.appium', { flip: false }); },
+    });
+  }
+  patchedAndroidPrototypes.add(PageProto);
+}
+
+module.exports = {
+  BRIDGE_CALL_SENTINEL,
+  bridgeCall,
+  makeBridgeProxy,
+  ensureAndroidPrototypesPatched,
+};

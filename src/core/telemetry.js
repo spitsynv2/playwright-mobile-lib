@@ -21,6 +21,7 @@ function isSensitiveKey(key) {
   return sensitiveKeys.has(String(key).toLowerCase().replace(/[^a-z0-9]/g, ''));
 }
 
+/** Redact secrets and limit nested values for a report payload. */
 function summarize(value, depth = 0, seen = new WeakSet()) {
   try {
     if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') return value;
@@ -64,6 +65,7 @@ function summarize(value, depth = 0, seen = new WeakSet()) {
   }
 }
 
+/** Limit a JSON payload to maxBytes. */
 function boundPayload(value, maxBytes = MAX_ACTION_PARAMS_BYTES) {
   try {
     const serialized = JSON.stringify(value);
@@ -78,6 +80,7 @@ function boundPayload(value, maxBytes = MAX_ACTION_PARAMS_BYTES) {
   }
 }
 
+/** Return the first caller frame outside this library and node_modules. */
 function captureSource() {
   const stack = new Error().stack || '';
   for (const line of stack.split('\n').slice(1)) {
@@ -112,6 +115,7 @@ function sanitizeUrl(value) {
   }
 }
 
+/** Redact secrets in recorded method params. */
 function sanitizeMethodParams(method, params) {
   const safe = summarize(params);
   if (!safe || typeof safe !== 'object') return safe;
@@ -145,6 +149,7 @@ function emitAction(action) {
   } catch {}
 }
 
+/** Run an action and emit a report event for its result. */
 async function recordAction(kind, method, params, action) {
   const startedAt = Date.now();
   let reportingAvailable = false;

@@ -24,8 +24,7 @@ type PlaywrightDevices = typeof import('@playwright/test').devices;
 type DeviceDescriptor = PlaywrightDevices[string];
 
 /**
- * Resolve a Playwright device preset (viewport / userAgent metadata) for an iOS
- * device name, including this library's custom iPhone presets and aliases.
+ * Resolve a Playwright device preset for an iOS device name or alias.
  *
  * @param deviceName Device name or alias (e.g. `"iPhone 16 Plus"`, `"iphone xr"`).
  * @param playwrightDevices The Playwright `devices` catalog to extend.
@@ -37,11 +36,9 @@ export function resolveIOSDevicePreset(
 ): DeviceDescriptor | null;
 
 /**
- * Run `fn` with the iOS Safari bridge switched to Appium (native) input mode,
- * restoring the previous mode afterwards. iOS only.
- *
- * Prefer `page.appium.*` / `locator.appium.*` for single calls; use this to wrap
- * a block of interactions that must all run in Appium input mode.
+ * Run `fn` in Appium (native) input mode on iOS, then restore the previous mode.
+ * Prefer `page.appium.*` or `locator.appium.*` for one call.
+ * A local pre-flight has no bridge and runs `fn` with no mode change.
  */
 export function withAppiumInputMode<T>(page: Page, fn: () => Promise<T> | T): Promise<T>;
 
@@ -49,9 +46,8 @@ export function withAppiumInputMode<T>(page: Page, fn: () => Promise<T> | T): Pr
 export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 /**
- * On/off capability. Prefer a boolean; `'true'` / `'false'` (also `'1'` / `'0'`)
- * are accepted so an environment variable can be passed through unparsed.
- * The library rejects invalid strings during remote session setup.
+ * On/off capability. Prefer a boolean. Also accepts `'true'`, `'false'`, `'1'`, and `'0'`.
+ * The library rejects invalid strings at remote session setup.
  */
 export type GateFlag = boolean | 'true' | 'false' | (string & {});
 
@@ -59,17 +55,12 @@ export type GateFlag = boolean | 'true' | 'false' | (string & {});
 export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
 
 /**
- * Tab/browsing mode requested at connect time. Defaults to `private`.
- *
- * `private` browses without persisting history or site data; `public` browses in
- * the normal profile. A `single-tab-*` mode reuses one tab for the whole run
- * instead of opening a tab per page.
- *
- * iOS Safari honors all four with full isolation. On Android, `private` is
- * best-effort: where the device's browser cannot provide an isolated tab, the
- * run continues in the normal profile with a warning instead of failing, and
- * `single-tab-*` is iOS-only — Chrome is relaunched per test, so no tab survives
- * one, and the run falls back to `public` / `private` with a warning.
+ * Tab mode at connect time. The default is `private`.
+ * `private` does not persist history or site data. `public` uses the normal profile.
+ * A `single-tab-*` mode reuses one tab for the run.
+ * iOS Safari supports all four modes with isolation.
+ * Android can use the normal profile for `private` and emit a warning.
+ * Android maps `single-tab-*` to `public` or `private` with a warning.
  */
 export type BrowsingMode =
   | 'public'
@@ -80,8 +71,8 @@ export type BrowsingMode =
   | 'single-tab';
 
 /**
- * iOS device names this library resolves to a Playwright preset, including its
- * own iPhone presets. Any other Playwright device name is also accepted.
+ * iOS device names this library maps to a Playwright preset, plus its own iPhone presets.
+ * Any other Playwright device name is also accepted.
  */
 export type IOSDeviceName =
   | 'iPhone 16'
@@ -92,9 +83,8 @@ export type IOSDeviceName =
   | (string & {});
 
 /**
- * Context options forwarded to the Android Chrome browser launch. Mirrors the
- * `BrowserContextOptions` subset the Android context honors, plus its two
- * launch-only keys.
+ * Context options for the Android Chrome browser launch.
+ * The type is a `BrowserContextOptions` subset plus `args` and `pkg`.
  */
 type AndroidLaunchCapabilities = Pick<
   BrowserContextOptions,
@@ -126,7 +116,7 @@ type AndroidLaunchCapabilities = Pick<
   | 'userAgent'
   | 'viewport'
 > & {
-  /** Android: extra command-line flags for the launched browser. Merged after the driver's own flags. */
+  /** Android: extra command-line flags for the browser. The driver merges these after its own flags. */
   args?: string[];
   /** Android: browser package to launch. Defaults to `"com.android.chrome"`. */
   pkg?: string;
@@ -139,44 +129,32 @@ type AndroidLaunchCapabilities = Pick<
 export interface Capabilities extends AndroidLaunchCapabilities {
   /** Selects the platform. Required. */
   platformName: 'iOS' | 'Android';
-  /** Remote device selector (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). Spaces, underscores, hyphens, and case are interchangeable. For a remote run, provide this value, `deviceUuid`, or both. */
+  /** Remote device selector (e.g. `"iPhone 16 Plus"`, `"Pixel 3 XL"`). For a remote run, set this, `deviceUuid`, or both. */
   deviceName?: IOSDeviceName;
-  /** Remote device UUID selector: the UDID on iOS and the ADB serial on Android. For a remote run, provide this value, `deviceName`, or both. */
+  /** Remote device UUID: UDID on iOS, ADB serial on Android. For a remote run, set this, `deviceName`, or both. */
   deviceUuid?: string;
-  /** Android device serial for direct-ADB selection (or set `ANDROID_SERIAL`). For a farm run, select the device with `deviceUuid` instead. */
+  /** Android device serial for direct ADB selection (or set `ANDROID_SERIAL`). For a farm run, use `deviceUuid` instead. */
   serial?: string;
   /**
-   * Tab/browsing mode. Full parity on iOS; documented subset on Android.
-   * Defaults to `private` on iOS and `public` on Android. On Android `public`
-   * is stable and `private` is experimental.
-   *
-   * Any string is accepted so an environment variable can be passed through
-   * unparsed; an unrecognized mode throws when the session starts.
+   * Tab mode. The default is `private` on iOS and `public` on Android.
+   * On Android, `private` is experimental. An unrecognized mode throws when the session starts.
    */
   browsingMode?: BrowsingMode | (string & {});
   /** iOS: skip Safari history/data cleanup when the bridge starts. */
   skipSafariCleanup?: GateFlag;
-  /**
-   * Close the tab after each test. iOS closes the native tab; Android sweeps the
-   * context's tabs both when the browser is launched and before the context closes.
-   */
+  /** Close the tab after each test. iOS closes the native tab, and Android closes context tabs at launch and before the context closes. */
   closeTabAfterTest?: GateFlag;
-  /**
-   * Android: clear the browser package's data before each launch. Off by default.
-   * Tabs Chrome restores without reloading have no CDP target and cannot be swept,
-   * so this is the only way to reclaim them — at the cost of the whole profile.
-   */
+  /** Android: clear the browser package data before each launch. Off by default. */
   resetBrowserData?: GateFlag;
   /** iOS: bridge nav-kick retry gate. Defaults to disabled. */
   navKickEnabled?: GateFlag;
   /** iOS: bridge click-nav retry gate. Defaults to disabled. */
   clickNavRetriesEnabled?: GateFlag;
-  /** Remote session log levels. Android uses `bridge` and `pwserver`. `inspector` is iOS-only. */
+  /** Remote session log levels. Android uses `bridge` and `pwserver`, and `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
   /**
-   * Idle timeout in milliseconds for this remote device session. Omit this
-   * value to use the service default. `0` disables this timeout. The value
-   * must be a non-negative integer.
+   * Idle timeout in milliseconds for this remote device session.
+   * Omit for the service default. `0` disables the timeout. Pass a non-negative integer.
    */
   idleTimeoutMs?: number;
 }
@@ -187,7 +165,7 @@ export interface MobileWorkerOptions {
   capabilities: Capabilities;
 }
 
-/** The device the worker is actually running against, as resolved by the platform driver. */
+/** Device the platform driver selected for this worker. */
 export interface DeviceInfo {
   deviceName: string;
   platformName: string;
@@ -199,14 +177,9 @@ export interface DeviceInfo {
 /** Read-only worker-scoped fixtures added by this library. */
 export interface MobileWorkerFixtures {
   /**
-   * Android device runs only: the `AndroidDevice` the context was launched from.
-   * Gives UIAutomator selectors (`tap` / `fill` / `wait` / `info` / `press`) and
-   * `shell()`, which reach native UI outside the web contents — system permission
-   * sheets, the download bar, intent choosers.
-   *
-   * Reading it throws on iOS (use `page.bridge.acceptAlert` / `page.bridge.nativeInput`)
-   * and on a local pre-flight run, which has no device. `close` and `launchBrowser`
-   * are blocked because the `_connection` and `context` fixtures own them.
+   * Android only: the `AndroidDevice` that launched the context.
+   * Use UIAutomator (`tap` / `fill` / `wait` / `info` / `press`) and `shell()` for native UI.
+   * A read throws on iOS and on a local pre-flight. `close` and `launchBrowser` are blocked.
    */
   device: AndroidDevice;
   /** Resolved device metadata for this worker's session. */
@@ -219,7 +192,7 @@ export interface MobileWorkerFixtures {
 export interface MobileTestOptions {
   /** iOS only: reopen `page` in a fresh tab of this mode before the test body. */
   reopenInMode: 'private' | 'public' | undefined;
-  /** Extra options merged into the fixture context (iOS `newContext` / Android `launchBrowser`). */
+  /** Extra options the fixture merges into the context (iOS `newContext` / Android `launchBrowser`). */
   extraContextOptions: BrowserContextOptions;
 }
 
@@ -229,25 +202,20 @@ export type IOSWorkerOptions = MobileWorkerOptions;
 export type IOSTestOptions = MobileTestOptions;
 
 /**
- * Worker-scoped Playwright fixtures, with `browser` re-pointed at the platform
- * connection instead of a locally launched browser.
+ * Worker-scoped Playwright fixtures.
+ * `browser` is the platform connection, not a local browser.
  */
 type MobilePlaywrightWorkerArgs = Omit<PlaywrightWorkerArgs, 'browser'> & {
   /**
-   * The worker's browser connection. Remote iOS gives a WebKit `Browser`; a
-   * local pre-flight run gives the launched `Browser`. Reading it throws on an
-   * Android device run, where the connection is an `AndroidDevice` — use
-   * `context` / `page` there.
+   * Worker browser connection. Remote iOS and a local pre-flight return a `Browser`.
+   * On an Android device run, a read throws. Use `context` or `page` there.
    */
   browser: Browser;
 };
 
 /**
- * Cross-platform Playwright `test`. The platform is chosen from
- * `capabilities.platformName` (`'iOS'` -> Safari, `'Android'` -> Chrome).
- * `page.bridge` exists on both platforms with a per-platform op set; the
- * iOS-only extras (`page.appium`, `page.setBrowsingMode`, `reopenInMode`) are
- * no-ops / unavailable on Android.
+ * Cross-platform Playwright `test`. `capabilities.platformName` selects iOS Safari or Android Chrome.
+ * `page.bridge` exists on both platforms. `page.appium`, `page.setBrowsingMode`, and `reopenInMode` are iOS-only.
  */
 export const test: TestType<
   PlaywrightTestArgs & PlaywrightTestOptions & MobileTestOptions,
@@ -255,9 +223,8 @@ export const test: TestType<
 >;
 
 /**
- * `defineConfig` typed with this library's worker/test options (e.g.
- * `capabilities`). Mirrors Playwright's overloads, so consumer option fixtures
- * and the `defineConfig(base, override)` merge form both type-check.
+ * Playwright `defineConfig` with this library's worker and test options.
+ * The overloads match Playwright, plus the `defineConfig(base, override)` merge form.
  */
 export function defineConfig(
   config: PlaywrightTestConfig<MobileTestOptions, MobileWorkerOptions>,
@@ -279,22 +246,22 @@ export function defineConfig<T, W>(
 
 /** Bridge operations available on both platforms through `page.bridge.<op>(args?)`. */
 interface BridgeCommonOps {
-  /** Return the bridge's per-test session id (used to correlate video/logs). */
+  /** Return the per-test session id. Use it to correlate video and logs. */
   getSessionId(args?: Record<string, never>): Promise<string>;
   /** Return the selected device metadata (deviceName / platformName / osVersion). */
   getDeviceInfo(args?: Record<string, never>): Promise<string>;
 }
 
-/** Bridge operations served by the Android Chrome bridge. */
+/** Bridge operations the Android Chrome bridge serves. */
 interface AndroidBridgeKnownOps extends BridgeCommonOps {}
 
-/** Bridge operations served by the iOS Safari bridge. */
+/** Bridge operations the iOS Safari bridge serves. */
 interface IOSBridgeKnownOps extends BridgeCommonOps {
   /** Set the bridge input mode: `'js'` injection (default) or `'appium'` native input. */
   setInputMode(args: { mode: 'js' | 'appium' }): Promise<string>;
   /** Switch the Safari tab group to private/public. Prefer `page.setBrowsingMode`. */
   setBrowsingMode(args: { mode: 'private' | 'public' }): Promise<string>;
-  /** Clear Safari history. Invalidates the current page (its WebContent process is torn down). */
+  /** Clear Safari history. This call invalidates the current page. */
   clearSafariHistory(args?: Record<string, never>): Promise<string>;
   /** Report whether this page's Safari tab is currently foreground. */
   isForeground(args?: Record<string, never>): Promise<string>;
@@ -318,9 +285,8 @@ interface IOSBridgeKnownOps extends BridgeCommonOps {
   setNavRetries(args: { enabled: boolean }): Promise<'true' | 'false'>;
 }
 
-// Any op the connected bridge registers is auto-callable; the index signature
-// keeps that open-ended surface typed alongside the known ops. Ops outside
-// AndroidBridgeKnownOps reject on Android, and vice versa.
+// Any op the connected bridge registers is callable. The index signature types that open surface.
+// Ops outside AndroidBridgeKnownOps reject on Android. Ops outside IOSBridgeKnownOps reject on iOS.
 type BridgeApi = IOSBridgeKnownOps & AndroidBridgeKnownOps & {
   [op: string]: (args?: Record<string, unknown>) => Promise<unknown>;
 };
@@ -334,18 +300,24 @@ declare module '@playwright/test' {
   interface PlaywrightTestOptions {
     /** iOS only: reopen `page` in a fresh tab of this mode before the test body. */
     reopenInMode: 'private' | 'public' | undefined;
-    /** Extra options merged into the fixture context (iOS `newContext` / Android `launchBrowser`). */
+    /** Extra options the fixture merges into the context (iOS `newContext` / Android `launchBrowser`). */
     extraContextOptions: BrowserContextOptions;
   }
 
   interface Page {
-    /** iOS only: proxy that runs the forwarded Page call in Appium (native) input mode. */
+    /**
+     * Proxy that forwards a Page call in Appium (native) input mode on an iOS device.
+     * On an iOS pre-flight and on Android, the proxy forwards to the Playwright action.
+     */
     readonly appium: Page;
-    /** Dynamic bridge RPC — `page.bridge.<op>(args?)`. iOS serves the full op set; Android serves {@link AndroidBridgeKnownOps}. */
+    /**
+     * Bridge RPC: `page.bridge.<op>(args?)`.
+     * iOS serves the full op set. Android serves {@link AndroidBridgeKnownOps}. A local pre-flight throws `BridgeUnavailableError`.
+     */
     readonly bridge: BridgeApi;
     /**
-     * iOS only: switch the Safari browsing mode. This spawns a fresh tab the
-     * bridge adopts as a new page, so use the returned `Page` afterwards.
+     * iOS only: switch the Safari browsing mode.
+     * On a device, use the returned `Page`. A local pre-flight returns the same page.
      */
     setBrowsingMode(mode: 'private' | 'public', options?: { timeout?: number }): Promise<Page>;
 
@@ -360,7 +332,10 @@ declare module '@playwright/test' {
   }
 
   interface Locator {
-    /** iOS only: proxy that runs the forwarded Locator call in Appium (native) input mode. */
+    /**
+     * Proxy that forwards a Locator call in Appium (native) input mode on an iOS device.
+     * On an iOS pre-flight and on Android, the proxy forwards to the Playwright action.
+     */
     readonly appium: Locator;
 
     /** @deprecated iOS: Locator.hover() is unsupported on this device — iOS Safari has no hover; touch devices fire pointer events on tap only. Throws at runtime. */

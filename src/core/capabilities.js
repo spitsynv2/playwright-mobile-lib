@@ -1,14 +1,4 @@
-// Per-run connection knobs (endpoint + slowMo) from env. Capabilities themselves
-// come from each project's `use: { capabilities }` and are sent to the orchestrator
-// as the x-pwm-capabilities connect header; it pool-matches a free device against
-// them. There are no single-env capability fallbacks: multi-device/multi-launch
-// runs declare one project per device, so a global env can't address them.
-
-// Component sources for the farm's combined session.log. Verbosity is controlled
-// per source via capabilities.logLevels (e.g. { bridge: 'debug',
-// inspector: 'off' }); a level of 'off' disables that component's configured
-// debug logging, though launcher/lifecycle lines may remain. An unset level
-// keeps the orchestrator default.
+/** Resolve farm connection settings and connect headers from environment and capabilities. */
 const SESSION_LOG_NAMES = ['bridge', 'pwserver', 'inspector'];
 const VALID_LOG_LEVELS = new Set(['off', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']);
 
@@ -22,6 +12,7 @@ function logLevelOff(name, level) {
   return v === 'off';
 }
 
+/** Return session log names that are not set to off. Launcher lines can still appear. */
 function activeSessionLogs(capabilities) {
   const levels = (capabilities && capabilities.logLevels) || {};
   return SESSION_LOG_NAMES.filter((name) => !logLevelOff(name, levels[name]));
@@ -31,12 +22,7 @@ function platformKey(platform) {
   return String(platform || '').toLowerCase() === 'android' ? 'android' : 'ios';
 }
 
-// Endpoint as configured, userinfo included. Explicit per-platform env
-// (IOS_WS_ENDPOINT / ANDROID_WS_ENDPOINT) wins for back-compat and direct-server
-// runs; otherwise PWM_ORCHESTRATOR is the full session endpoint (e.g.
-// wss://host:7465/sessions). Empty string means "no farm" (local webkit.launch /
-// ADB devices). Capabilities ride the connect header, so any legacy ?query on
-// the endpoint is stripped; the orchestrator pool-matches on the header instead.
+// Platform env wins over PWM_ORCHESTRATOR. Strip a query string. An empty value means no farm.
 function rawWsEndpoint(platform) {
   const key = platformKey(platform);
   const explicit = key === 'android' ? process.env.ANDROID_WS_ENDPOINT : process.env.IOS_WS_ENDPOINT;
@@ -52,9 +38,7 @@ function decodeUserinfo(value) {
   }
 }
 
-// Userinfo in the endpoint (wss://user:pass@host) is a convenience form for an
-// orchestrator behind a basic-auth proxy; it becomes an Authorization header and
-// must never reach Playwright's connect URL.
+// Move URL userinfo into Authorization. Playwright connect must not receive credentials.
 function splitEndpointCredentials(endpoint) {
   const empty = { endpoint: endpoint || '', username: '', password: '' };
   if (!endpoint) return empty;
@@ -72,21 +56,19 @@ function splitEndpointCredentials(endpoint) {
   return { endpoint: parsed.toString(), username, password };
 }
 
+/** Return the farm WebSocket endpoint for a platform without credentials. */
 function resolveWsEndpoint(platform) {
   return splitEndpointCredentials(rawWsEndpoint(platform)).endpoint;
 }
 
-// Default for runs that omit per-project capabilities. Real device/farm runs must
-// declare platformName (plus deviceName / deviceUuid / browsingMode /
-// logLevels) in `use: { capabilities }`.
+// Do not add env fallbacks for capabilities. Each project declares its own device.
 const defaultCapabilities = { platformName: 'iOS' };
 
 const BROWSING_MODES = new Set([
   'public', 'private', 'single-tab-public', 'single-tab-private', 'single-tab',
 ]);
 
-// The orchestrator and the Android launcher both fall back to their default mode
-// on an unrecognized value, so a typo has to fail here to stay visible.
+// Reject an unknown browsingMode. The orchestrator silently uses its default for a bad value.
 function assertBrowsingMode(value) {
   if (value === undefined || value === null || value === '') return;
   if (BROWSING_MODES.has(String(value).trim().toLowerCase())) return;
@@ -96,9 +78,7 @@ function assertBrowsingMode(value) {
   );
 }
 
-// The orchestrator reads idleTimeoutMs as an integer millisecond count and frees
-// the device after that much silence; 0 disables it. A negative or non-integer
-// value would be dropped server-side, so fail here to keep the mistake visible.
+// Reject a negative or non-integer idleTimeoutMs. The orchestrator drops an invalid value.
 function assertIdleTimeoutMs(value) {
   if (value === undefined || value === null) return;
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
@@ -116,9 +96,7 @@ function effectiveCapabilities(capabilities) {
   return caps;
 }
 
-// Gate capabilities ride the connect header, where the orchestrator also accepts
-// the quoted 'true'/'false' forms; a local reader must resolve them the same way
-// or an env-driven string would land on the wrong branch. undefined = unset.
+// Parse boolean and the quoted true or false forms. Match the orchestrator.
 function gateFlag(value) {
   if (typeof value === 'boolean') return value;
   const v = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
@@ -131,9 +109,10 @@ function basicAuthHeader(user, password) {
   return `Basic ${Buffer.from(`${user || ''}:${password || ''}`).toString('base64')}`;
 }
 
-// Optional Authorization for an orchestrator behind an auth proxy. Precedence:
-// a raw header override, then a bearer token, then basic user/password, then
-// userinfo carried by the endpoint URL.
+/**
+ * Build an optional Authorization header for an auth proxy.
+ * Precedence: PWM_AUTH_HEADER, then PWM_AUTH_TOKEN, then user and password, then URL userinfo.
+ */
 function buildAuthHeader(platform) {
   const explicit = (process.env.PWM_AUTH_HEADER || '').trim();
   if (explicit) return explicit;
@@ -151,8 +130,7 @@ function buildAuthHeader(platform) {
   return '';
 }
 
-// Orchestrator connect headers: capabilities JSON for pool-matching, the stable
-// client id for device-pinning across a reconnect, and optional Authorization.
+/** Build orchestrator connect headers from capabilities and optional auth. */
 function buildConnectHeaders(capabilities, platform, id = clientId) {
   const headers = { 'x-pwm-capabilities': JSON.stringify(effectiveCapabilities(capabilities)) };
   if (id) headers['x-pwm-client-id'] = id;
@@ -166,14 +144,13 @@ const slowMoMs = (() => {
   return Number.isFinite(raw) && raw >= 0 ? raw : 0;
 })();
 
-// connect timeout. Must cover a cold container start (orchestrator
-// ORCH_HEALTH_START_TIMEOUT) so a reconnect after a wedge can wait out a restart.
+// Must cover a cold container start. A reconnect can wait for a restart.
 const connectTimeoutMs = (() => {
   const raw = parseInt(process.env.PWM_CONNECT_TIMEOUT_MS || process.env.IOS_CONNECT_TIMEOUT_MS || '', 10);
   return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
 })();
 
-// TEST_PARALLEL_INDEX + runner PID: stable across worker recycle, unique across concurrent runs.
+/** Build a client id that stays stable across a worker recycle. */
 function resolveClientId(env = process.env, ppid = process.ppid) {
   const explicit = (env.PWM_CLIENT_ID || env.IOS_CLIENT_ID || '').trim();
   if (explicit) return explicit;

@@ -1,10 +1,7 @@
-// Platform-agnostic guard helpers. Restriction APIs throw loudly instead of
-// silently acking a no-op (which would let a test pass while nothing happened);
-// caveat warnings wrap a real API to warn once about surprising behavior. The
-// per-platform method tables live in each platform folder (e.g. ios/unsupported-ios).
-
+/** Throw or warn helpers for unsupported and unexpected device APIs. */
 const CAVEAT_WRAPPED = Symbol('playwright-mobile-lib.caveat-wrapped');
 
+/** Install methods that throw when a test calls an unsupported API. */
 function defineThrowing(target, kind, methods) {
   for (const [name, why] of Object.entries(methods)) {
     Object.defineProperty(target, name, {
@@ -17,6 +14,7 @@ function defineThrowing(target, kind, methods) {
   }
 }
 
+/** Install a one-time warning on a method with unexpected device behavior. */
 function defineCaveatWarning(proto, kind, name, why) {
   const original = proto[name];
   if (typeof original !== 'function' || original[CAVEAT_WRAPPED]) return;

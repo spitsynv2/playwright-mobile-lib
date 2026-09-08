@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { ensureAppiumPrototypesPatched } = require('../src/platforms/ios/bridge-proxy');
+const { withConnectEnv } = require('./helpers/connect-env');
+
+const FARM = { PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' };
 
 const SENTINEL = '__pwm_bridge_call__:';
 
@@ -19,7 +22,10 @@ function makeIosPage({ evalImpl } = {}) {
   const context = Object.create(contextProto);
   context.waitForEvent = async (event) => (event === 'page' ? newTab : null);
 
-  const locatorProto = { page() { return page; } };
+  const locatorProto = {
+    page() { return page; },
+    async tap(options) { calls.push(['locator.tap', options]); return 'locator-tapped'; },
+  };
   const locator = Object.create(locatorProto);
 
   const pageProto = {
@@ -55,59 +61,115 @@ function captureWarnings() {
   return { warnings, restore() { console.warn = original; } };
 }
 
-test('a page-invalidating bridge op closes the tab after the call', async () => {
-  const { page, calls } = makeIosPage();
-  ensureAppiumPrototypesPatched(page);
+test.describe('farm iOS page.bridge', { concurrency: 1 }, () => {
+  test('a page-invalidating bridge op closes the tab after the call', async () => {
+    await withConnectEnv(FARM, async () => {
+      const { page, calls } = makeIosPage();
+      ensureAppiumPrototypesPatched(page);
 
-  const result = await page.bridge.clearSafariHistory();
+      const result = await page.bridge.clearSafariHistory();
 
-  assert.deepEqual(result, { ok: true, op: 'clearSafariHistory' });
-  assert.equal(page.isClosed(), true, 'the dead-inspector tab is closed so teardown skips it');
-  assert.deepEqual(calls[calls.length - 1], ['close']);
-});
-
-test('a target-closed error during a page-invalidating op is treated as success', async () => {
-  const { page } = makeIosPage({
-    evalImpl(request) {
-      if (request.op === 'clearSafariHistory') throw new Error('Target page, context or browser has been closed');
-      return { ok: true };
-    },
+      assert.deepEqual(result, { ok: true, op: 'clearSafariHistory' });
+      assert.equal(page.isClosed(), true, 'the dead-inspector tab is closed so teardown skips it');
+      assert.deepEqual(calls[calls.length - 1], ['close']);
+    });
   });
-  ensureAppiumPrototypesPatched(page);
 
-  assert.equal(await page.bridge.clearSafariHistory(), 'ok');
-  assert.equal(page.isClosed(), true);
-});
+  test('a target-closed error during a page-invalidating op is treated as success', async () => {
+    await withConnectEnv(FARM, async () => {
+      const { page } = makeIosPage({
+        evalImpl(request) {
+          if (request.op === 'clearSafariHistory') throw new Error('Target page, context or browser has been closed');
+          return { ok: true };
+        },
+      });
+      ensureAppiumPrototypesPatched(page);
 
-test('a non-invalidating bridge op propagates its error and keeps the page open', async () => {
-  const { page } = makeIosPage({
-    evalImpl(request) {
-      if (request.op === 'brokenOp') throw new Error('boom');
-      return { ok: true };
-    },
+      assert.equal(await page.bridge.clearSafariHistory(), 'ok');
+      assert.equal(page.isClosed(), true);
+    });
   });
-  ensureAppiumPrototypesPatched(page);
 
-  await assert.rejects(() => page.bridge.brokenOp(), /boom/);
-  assert.equal(page.isClosed(), false);
+  test('a non-invalidating bridge op propagates its error and keeps the page open', async () => {
+    await withConnectEnv(FARM, async () => {
+      const { page } = makeIosPage({
+        evalImpl(request) {
+          if (request.op === 'brokenOp') throw new Error('boom');
+          return { ok: true };
+        },
+      });
+      ensureAppiumPrototypesPatched(page);
+
+      await assert.rejects(() => page.bridge.brokenOp(), /boom/);
+      assert.equal(page.isClosed(), false);
+    });
+  });
+
+  test('setBrowsingMode returns the freshly adopted tab', async () => {
+    await withConnectEnv(FARM, async () => {
+      const { page, locator } = makeIosPage();
+      ensureAppiumPrototypesPatched(page);
+      const reopened = await page.setBrowsingMode('public');
+      assert.equal(reopened.id, 'reopened-tab');
+      assert.ok(locator, 'the locator prototype was probed without error');
+    });
+  });
 });
 
-test('setBrowsingMode returns the freshly adopted tab', async () => {
-  const { page, locator } = makeIosPage();
-  ensureAppiumPrototypesPatched(page);
-  const reopened = await page.setBrowsingMode('public');
-  assert.equal(reopened.id, 'reopened-tab');
-  assert.ok(locator, 'the locator prototype was probed without error');
+test('page.bridge on a local pre-flight throws a dedicated error and does not evaluate', async () => {
+  await withConnectEnv({}, async () => {
+    const { page, calls } = makeIosPage();
+    ensureAppiumPrototypesPatched(page);
+
+    await assert.rejects(() => page.bridge.getSessionId(), (err) => {
+      assert.equal(err.name, 'BridgeUnavailableError');
+      assert.match(err.message, /real-device bridge/);
+      return true;
+    });
+    assert.equal(calls.length, 0);
+  });
 });
 
-test('a forced pointer action wraps the call in a hit-test bypass', async () => {
-  const { page, calls } = makeIosPage();
-  ensureAppiumPrototypesPatched(page);
+test('setBrowsingMode on a local pre-flight returns the same page', async () => {
+  await withConnectEnv({}, async () => {
+    const { page } = makeIosPage();
+    ensureAppiumPrototypesPatched(page);
+    assert.equal(await page.setBrowsingMode('private'), page);
+  });
+});
 
-  await page.tap({ force: true });
+test('locator.appium.tap on a local pre-flight forwards without a sentinel RPC', async () => {
+  await withConnectEnv({}, async () => {
+    const { page, locator, calls } = makeIosPage();
+    ensureAppiumPrototypesPatched(page);
+    assert.equal(await locator.appium.tap(), 'locator-tapped');
+    assert.deepEqual(calls, [['locator.tap', undefined]]);
+  });
+});
 
-  const sequence = calls.map((call) => (call[0] === 'evaluate' ? `bypass:${call[2].on}` : call[0]));
-  assert.deepEqual(sequence, ['bypass:true', 'tap', 'bypass:false']);
+test.describe('forced pointer actions', { concurrency: 1 }, () => {
+  test('a forced pointer action wraps the call in a hit-test bypass', async () => {
+    await withConnectEnv(FARM, async () => {
+      const { page, calls } = makeIosPage();
+      ensureAppiumPrototypesPatched(page);
+
+      await page.tap({ force: true });
+
+      const sequence = calls.map((call) => (call[0] === 'evaluate' ? `bypass:${call[2].on}` : call[0]));
+      assert.deepEqual(sequence, ['bypass:true', 'tap', 'bypass:false']);
+    });
+  });
+
+  test('a forced pointer action on a local pre-flight skips the hit-test bypass', async () => {
+    await withConnectEnv({}, async () => {
+      const { page, calls } = makeIosPage();
+      ensureAppiumPrototypesPatched(page);
+
+      await page.tap({ force: true });
+
+      assert.deepEqual(calls, [['tap', { force: true }]]);
+    });
+  });
 });
 
 test('an unforced pointer action does not touch the hit-test bypass', async () => {

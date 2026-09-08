@@ -41,10 +41,10 @@ These additions are platform-specific:
 
 | API | Availability |
 | --- | --- |
-| `page.bridge.<operation>(args?)` | Both platforms, with a per-platform operation set. iOS serves the full set. Android serves `getSessionId` and `getDeviceInfo`. |
-| `page.appium.<method>(...)` / `locator.appium.<method>(...)` | iOS only |
-| `page.setBrowsingMode('private' \| 'public')` | iOS only |
-| `withAppiumInputMode(page, fn)` | iOS only |
+| `page.bridge.<operation>(args?)` | Both platforms, with a per-platform operation set. iOS serves the full set. Android serves `getSessionId` and `getDeviceInfo`. A local pre-flight throws `BridgeUnavailableError` and does not evaluate the sentinel string. |
+| `page.appium.<method>(...)` / `locator.appium.<method>(...)` | iOS device: Appium input mode. iOS pre-flight and Android: Playwright action. |
+| `page.setBrowsingMode('private' \| 'public')` | iOS device: a new tab. iOS pre-flight: the same page. |
+| `withAppiumInputMode(page, fn)` | iOS device: Appium input mode for the body. iOS pre-flight: runs `fn` with no flip. |
 | `reopenInMode` | iOS only. Ignored on Android |
 | `resolveIOSDevicePreset()` | iOS only |
 | `browser` fixture | iOS and local pre-flight runs. Throws on an Android device run |
@@ -103,8 +103,10 @@ await submit.tap();
 
 Covered JS taps and clicks wait for the target to become actionable. A forced
 tap or click temporarily bypasses the hit test, so use `force` only when the test
-intentionally needs that behavior. Appium taps use native coordinates and do not
-retarget through an overlay.
+intentionally needs that behavior. On an iOS device the library sends
+`setHitTestBypass` for that call. On a local pre-flight it uses Playwright
+`force` only. Appium taps use native coordinates and do not retarget through an
+overlay.
 
 `page.appium.goBack()` and `page.appium.goForward()` are the trusted
 history-navigation variants: they tap the physical Safari Back and Forward
@@ -116,7 +118,7 @@ would — it does not hang). Scroll to the top first
 touch the toolbar.
 
 `page.setBrowsingMode()` spawns a fresh tab that is adopted as a new page, so use
-the returned `Page` afterwards.
+the returned `Page` afterwards. On a local pre-flight it returns the same page.
 
 ### APIs that a real device cannot support
 

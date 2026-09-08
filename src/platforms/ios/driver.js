@@ -1,6 +1,4 @@
-// iOS Safari platform driver: connects WebKit to the orchestrator session
-// endpoint, or launches locally, creates the context/page, and wires the
-// bridge/appium/unsupported prototypes + Zebrunner session handshake.
+/** Connects WebKit to the orchestrator or launches it locally. */
 const { webkit, devices } = require('@playwright/test');
 
 const { resolveIOSDevicePreset } = require('./custom-devices');
@@ -22,7 +20,7 @@ const { UNSUPPORTED_CONTEXT_METHODS, UNSUPPORTED_USE_OPTIONS } = require('./unsu
 const { ensureAppiumPrototypesPatched } = require('./bridge-proxy');
 const { recordAction } = require('../../core/telemetry');
 
-// Fallback preset for local emulation when the caps device is unknown to Playwright.
+// Fallback Playwright preset when the requested device name is unknown.
 const DEFAULT_LOCAL_IOS_DEVICE = 'iPhone 16 Plus';
 
 const driver = {
@@ -30,7 +28,6 @@ const driver = {
 
   unsupportedUseOptions: UNSUPPORTED_USE_OPTIONS,
 
-  // Connects to the bridge, or launches WebKit locally when no farm endpoint is set.
   async connect(capabilities) {
     const caps = effectiveCapabilities(capabilities);
     const wsEndpoint = resolveWsEndpoint('iOS');
@@ -53,11 +50,12 @@ const driver = {
     } catch {}
   },
 
-  // Requested device metadata used until the bridge reports the selected device.
-  // Farm runs need a pool filter: deviceName and/or deviceUuid. A local
-  // webkit.launch run has no device pool, so both are optional there.
+  /**
+   * Returns requested device data until the bridge reports the selected device.
+   */
   resolveDeviceInfo(capabilities) {
     const caps = effectiveCapabilities(capabilities);
+    // A farm run requires deviceName or deviceUuid. A local launch does not.
     if (resolveWsEndpoint('iOS') && !caps.deviceName && !caps.deviceUuid) {
       throw new Error(
         'capabilities.deviceName or capabilities.deviceUuid is required for device runs — '
@@ -71,9 +69,7 @@ const driver = {
     };
   },
 
-  // Playwright device preset (viewport/userAgent metadata) for the resolved device.
-  // On a real device the viewport is cosmetic (setViewportSize is blocked); the
-  // userAgent feeds reporting capabilities.
+  // On a real device the viewport is cosmetic. `setViewportSize` is blocked.
   resolvePreset(deviceInfo) {
     const preset = resolveIOSDevicePreset(deviceInfo.deviceName, devices);
     if (preset) return preset;
@@ -81,12 +77,13 @@ const driver = {
     return resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices) || {};
   },
 
-  // The connection is always a Browser here (bridge connect or webkit.launch).
   resolveBrowser(connection) {
     return connection;
   },
 
-  // iOS reaches native UI through the bridge's Appium session, not a device handle.
+  /**
+   * Throws. iOS has no device handle. Use `page.bridge` or `page.appium`.
+   */
   resolveDevice() {
     throw new Error(
       'The `device` fixture is Android-only — it exposes the AndroidDevice (UIAutomator over adb). '
@@ -106,10 +103,6 @@ const driver = {
     let page = await recordAction('fixture', 'fixture.page.create', {}, () => context.newPage());
     ensureAppiumPrototypesPatched(page);
 
-    // Handshake: pull the bridge's per-test session id at test start and push it to
-    // Zebrunner. The agent reporter registers a test session with this id in onTestEnd;
-    // farm artifacts (video.mp4, session.log) stay on S3 and are not fetched by the test.
-    // Capabilities are attached here so Browser/Platform populate even on a hang/timeout retry.
     let sessionId = '';
     let resolvedDeviceInfo = deviceInfo;
     try {
@@ -134,9 +127,7 @@ const driver = {
       attachDeviceLabel(resolvedDeviceInfo.deviceName);
     }
 
-    // Reopen the page in a fresh tab of the requested mode; the returned tab becomes
-    // the test's page. Best-effort: a missing/unsupported bridge (e.g. a local
-    // webkit.launch run) must not crash the test — keep the current page.
+    // If `setBrowsingMode` fails, keep the current page.
     const mode = reopenInMode && String(reopenInMode).toLowerCase();
     if (mode === 'private' || mode === 'public') {
       try {

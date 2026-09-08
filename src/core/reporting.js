@@ -1,6 +1,4 @@
-// Reports the bridge's per-test session id to Zebrunner. The agent reporter
-// registers a Zebrunner test session with that id; farm artifacts (video.mp4,
-// session.log) stay on S3 and are not downloaded or uploaded by the test process.
+/** Report the farm session id to Zebrunner. Farm artifacts stay on S3. */
 const reportingEnabled = String(process.env.REPORTING_ENABLED).toLowerCase() === 'true';
 
 let currentTest;
@@ -41,9 +39,7 @@ function isActionReportingAvailable() {
   return Boolean(available);
 }
 
-// Attach the device session capabilities (Browser/Platform) independently of any video, so
-// Zebrunner shows them even when the recording is missing (hang/timeout) or a retry's video
-// is not ready. Without a session carrying caps, Zebrunner falls back to "n/a / host OS".
+/** Attach device capabilities to the Zebrunner session even when video is missing. */
 function attachSessionCapabilities(sessionId, capabilities) {
   if (!reportingEnabled || !currentTest || !capabilities) return;
   try {
@@ -53,7 +49,7 @@ function attachSessionCapabilities(sessionId, capabilities) {
   }
 }
 
-// Attach a `device:<name>` label so mobile tests are searchable by device in Zebrunner.
+/** Attach a device label for Zebrunner device search. */
 function attachDeviceLabel(deviceName) {
   if (!reportingEnabled || !currentTest || !deviceName) return;
   try {

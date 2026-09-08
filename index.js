@@ -1,3 +1,4 @@
+/** Public exports for playwright-mobile-lib. */
 const playwright = require('@playwright/test');
 const { test, expect } = require('./src/test');
 const { withAppiumInputMode } = require('./src/platforms/ios/appium');

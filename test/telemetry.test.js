@@ -7,6 +7,7 @@ const reporting = require('../src/core/reporting');
 const { makeAppiumProxy } = require('../src/platforms/ios/appium');
 const { ensureAppiumPrototypesPatched, makeBridgeProxy } = require('../src/platforms/ios/bridge-proxy');
 const { recordAction, sanitizeMethodParams, summarize } = require('../src/core/telemetry');
+const { withConnectEnv } = require('./helpers/connect-env');
 
 const originalAttachAction = reporting.attachAction;
 const originalAvailability = reporting.isActionReportingAvailable;
@@ -109,23 +110,25 @@ test('telemetry serialization cannot change a successful action result', async (
 });
 
 test('reports bridge and Appium proxy methods at their public abstraction', async () => {
-  const actions = [];
-  reporting.attachAction = (action) => actions.push(action);
-  const page = {
-    evaluate: async (payload) => {
-      const request = JSON.parse(payload.split(':').slice(1).join(':'));
-      return request.op === 'setInputMode' ? 'js' : { ok: true };
-    },
-    waitForTimeout: async () => {},
-  };
+  await withConnectEnv({ PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' }, async () => {
+    const actions = [];
+    reporting.attachAction = (action) => actions.push(action);
+    const page = {
+      evaluate: async (payload) => {
+        const request = JSON.parse(payload.split(':').slice(1).join(':'));
+        return request.op === 'setInputMode' ? 'js' : { ok: true };
+      },
+      waitForTimeout: async () => {},
+    };
 
-  assert.deepEqual(await makeBridgeProxy(page).getSessionId({ detail: true }), { ok: true });
-  const receiver = { click: async (options) => options };
-  assert.deepEqual(await makeAppiumProxy(receiver, page, 'locator.appium').click({ force: true }), { force: true });
+    assert.deepEqual(await makeBridgeProxy(page).getSessionId({ detail: true }), { ok: true });
+    const receiver = { click: async (options) => options };
+    assert.deepEqual(await makeAppiumProxy(receiver, page, 'locator.appium').click({ force: true }), { force: true });
 
-  const completed = actions.filter((action) => action.status === 'passed');
-  assert.equal(completed[0].method, 'page.bridge.getSessionId');
-  assert.equal(completed[1].method, 'locator.appium.click');
+    const completed = actions.filter((action) => action.status === 'passed');
+    assert.equal(completed[0].method, 'page.bridge.getSessionId');
+    assert.equal(completed[1].method, 'locator.appium.click');
+  });
 });
 
 test('enriches page navigation with its full runtime URL and options', async () => {
