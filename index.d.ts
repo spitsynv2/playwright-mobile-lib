@@ -147,7 +147,8 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   serial?: string;
   /**
    * Tab/browsing mode. Full parity on iOS; documented subset on Android.
-   * Defaults to `private` on both.
+   * Defaults to `private` on iOS and `public` on Android. On Android `public`
+   * is stable and `private` is experimental.
    *
    * Any string is accepted so an environment variable can be passed through
    * unparsed; an unrecognized mode throws when the session starts.

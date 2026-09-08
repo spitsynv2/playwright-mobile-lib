@@ -32,9 +32,9 @@ const omitDriverInstall = process.env.ANDROID_OMIT_DRIVER_INSTALL === 'true';
 // Fallback preset for local emulation when the caps device is unknown to Playwright.
 const DEFAULT_LOCAL_ANDROID_DEVICE = 'Pixel 7';
 
-// Default mirrors the iOS bridge (`private`); on Android this is best-effort
-// (--incognito may be ignored). See android_browsing_modes plan for parity.
-const DEFAULT_ANDROID_BROWSING_MODE = 'private';
+// Android defaults to `public` (stable). `private` is experimental because Chrome
+// for Android has no CDP incognito flag, so isolation is best-effort.
+const DEFAULT_ANDROID_BROWSING_MODE = 'public';
 const BROWSING_MODES = new Set(['public', 'private']);
 
 // Chrome is force-stopped and relaunched per test, so no tab can span a run; a

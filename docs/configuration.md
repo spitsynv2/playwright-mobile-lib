@@ -10,7 +10,7 @@ no environment-variable fallbacks for device capabilities.
 | `platformName` | `'iOS' \| 'Android'` | Required. Selects the platform driver and route. |
 | `deviceName` | `string` | Remote device selector, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). Required for remote Android runs. For remote iOS runs, provide `deviceName`, `deviceUuid`, or both. Also selects the local emulation preset when set. |
 | `deviceUuid` | `string` | iOS Unique Device Identifier (UDID) selector. The value is not case-sensitive. With `deviceName`, both values must identify the same device. |
-| `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private`. A raw environment-variable string is accepted and validated at session setup. |
+| `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private` on iOS and `public` on Android. On Android `public` is stable and `private` is experimental. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
 | `resetBrowserData` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled. Enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
