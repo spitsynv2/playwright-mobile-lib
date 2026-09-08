@@ -62,7 +62,13 @@ async function withHitTestBypass(page, fn) {
 // Nested namespaces (page.mouse, page.keyboard, page.touchscreen) are
 // recursively wrapped so chained calls like page.appium.mouse.down() also
 // flip the bridge's input mode.
-function makeAppiumProxy(receiver, page, path = 'page.appium') {
+//
+// `flip` controls the bridge input-mode flip. A local pre-flight (webkit.launch,
+// no farm endpoint) has no bridge to receive the sentinel RPC, so the caller
+// passes `flip: false`; the proxy then forwards the action as a normal
+// Playwright call. This keeps page.appium.* / locator.appium.* usable in specs
+// without a device — the flip runs only on real-device runs.
+function makeAppiumProxy(receiver, page, path = 'page.appium', { flip = true } = {}) {
   return new Proxy({}, {
     get(_, prop) {
       const target = receiver[prop];
@@ -70,11 +76,13 @@ function makeAppiumProxy(receiver, page, path = 'page.appium') {
       if (typeof target === 'function') {
         return (...args) =>
           recordAction('appium', methodPath, { args }, () =>
-            withAppiumInputMode(page, () => target.apply(receiver, args)),
+            flip
+              ? withAppiumInputMode(page, () => target.apply(receiver, args))
+              : target.apply(receiver, args),
           );
       }
       if (target && typeof target === 'object') {
-        return makeAppiumProxy(target, page, methodPath);
+        return makeAppiumProxy(target, page, methodPath, { flip });
       }
       return target;
     },

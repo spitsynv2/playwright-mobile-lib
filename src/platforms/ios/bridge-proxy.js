@@ -2,6 +2,7 @@
 // page.bridge, page.setBrowsingMode, and the unsupported-API throwers onto the
 // Playwright Page/Locator/Mouse/Context prototypes.
 const { bridgeCall, makeAppiumProxy, withHitTestBypass } = require('./appium');
+const { resolveWsEndpoint } = require('../../core/capabilities');
 const { installForegroundScreenshotGate } = require('./screenshot-gate');
 const { recordAction } = require('../../core/telemetry');
 const { defineThrowing, defineCaveatWarning } = require('../../core/unsupported');
@@ -105,9 +106,11 @@ function wrapForceCapableMethods(proto, resolvePage) {
 function ensureAppiumPrototypesPatched(probePage) {
   const PageProto = Object.getPrototypeOf(probePage);
   if (patchedPagePrototypes.has(PageProto)) return;
+  // On a local pre-flight (no farm endpoint) there is no bridge to flip input
+  // mode, so forward appium.* as normal Playwright actions instead of failing.
   Object.defineProperty(PageProto, 'appium', {
     configurable: true,
-    get() { return makeAppiumProxy(this, this); },
+    get() { return makeAppiumProxy(this, this, 'page.appium', { flip: !!resolveWsEndpoint('iOS') }); },
   });
   Object.defineProperty(PageProto, 'bridge', {
     configurable: true,
@@ -145,7 +148,7 @@ function ensureAppiumPrototypesPatched(probePage) {
   const LocatorProto = Object.getPrototypeOf(probeLocator);
   Object.defineProperty(LocatorProto, 'appium', {
     configurable: true,
-    get() { return makeAppiumProxy(this, this.page(), 'locator.appium'); },
+    get() { return makeAppiumProxy(this, this.page(), 'locator.appium', { flip: !!resolveWsEndpoint('iOS') }); },
   });
   wrapForceCapableMethods(LocatorProto, (locator) => locator.page());
   defineThrowing(LocatorProto, 'Locator', UNSUPPORTED_LOCATOR_METHODS);

@@ -135,3 +135,21 @@ test('makeAppiumProxy flips the mode around a forwarded method and nested namesp
   assert.deepEqual(modesSeen, [['tap', 'appium'], ['mouse.down', 'appium']]);
   assert.equal(page.currentMode(), 'js', 'the mode is restored after each call');
 });
+
+test('makeAppiumProxy with flip:false forwards the call without touching the bridge', async () => {
+  const page = fakeBridgePage();
+  const modesSeen = [];
+  const receiver = {
+    async tap(...args) { modesSeen.push(['tap', page.currentMode()]); return args; },
+    mouse: {
+      async down() { modesSeen.push(['mouse.down', page.currentMode()]); return 'down'; },
+    },
+  };
+  const proxy = makeAppiumProxy(receiver, page, 'page.appium', { flip: false });
+
+  assert.deepEqual(await proxy.tap({ force: true }), [{ force: true }]);
+  assert.equal(await proxy.mouse.down(), 'down');
+
+  assert.deepEqual(modesSeen, [['tap', 'js'], ['mouse.down', 'js']]);
+  assert.equal(page.calls.length, 0, 'no setInputMode sentinel RPC on a local pre-flight');
+});
