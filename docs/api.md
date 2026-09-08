@@ -106,6 +106,15 @@ tap or click temporarily bypasses the hit test, so use `force` only when the tes
 intentionally needs that behavior. Appium taps use native coordinates and do not
 retarget through an overlay.
 
+`page.appium.goBack()` and `page.appium.goForward()` are the trusted
+history-navigation variants: they tap the physical Safari Back and Forward
+buttons, so a scrolled page that collapses the toolbar can leave the button
+not-found (the call then resolves to `null`, as a normal "no history" result
+would — it does not hang). Scroll to the top first
+(`await page.evaluate(() => window.scrollTo(0, 0))`), or use the default
+`page.goBack()` / `page.goForward()`, which take the JavaScript path and never
+touch the toolbar.
+
 `page.setBrowsingMode()` spawns a fresh tab that is adopted as a new page, so use
 the returned `Page` afterwards.
 

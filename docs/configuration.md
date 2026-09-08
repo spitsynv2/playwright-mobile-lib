@@ -8,8 +8,8 @@ no environment-variable fallbacks for device capabilities.
 | Capability | Type | Meaning |
 | --- | --- | --- |
 | `platformName` | `'iOS' \| 'Android'` | Required. Selects the platform driver and route. |
-| `deviceName` | `string` | Remote device selector, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). Required for remote Android runs. For remote iOS runs, provide `deviceName`, `deviceUuid`, or both. Also selects the local emulation preset when set. |
-| `deviceUuid` | `string` | iOS Unique Device Identifier (UDID) selector. The value is not case-sensitive. With `deviceName`, both values must identify the same device. |
+| `deviceName` | `string` | Remote device selector, such as `iPhone 16 Plus` or `Pixel 7`. Spaces, underscores, hyphens, and case are interchangeable with `devices.json` (`pixel-3-xl` matches `Pixel_3_XL`). For a remote run on either platform, provide `deviceName`, `deviceUuid`, or both. Also selects the local emulation preset when set. |
+| `deviceUuid` | `string` | Remote device selector: the UDID on iOS and the ADB serial on Android. Use it instead of, or with, `deviceName`. When you set both, they must identify the same device. |
 | `browsingMode` | `BrowsingMode \| string` | Tab/browsing mode requested at connect time. Defaults to `private` on iOS and `public` on Android. On Android `public` is stable and `private` is experimental. A raw environment-variable string is accepted and validated at session setup. |
 | `skipSafariCleanup` | `boolean` | iOS only: skip Safari history/data cleanup when the bridge starts. |
 | `closeTabAfterTest` | `boolean` | Close the tab after each test. Defaults to enabled. On Android this also sweeps leftover tabs when the browser is launched. |
@@ -17,6 +17,7 @@ no environment-variable fallbacks for device capabilities.
 | `navKickEnabled` | `boolean` | iOS only: navigation retry gate. Defaults to disabled. |
 | `clickNavRetriesEnabled` | `boolean` | iOS only: click-navigation retry gate. Defaults to disabled. |
 | `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Remote session log levels. iOS accepts all three sources. Android accepts `bridge` and `pwserver`. |
+| `idleTimeoutMs` | `number` | Remote session idle timeout in milliseconds. Omit it to use the service default. `0` disables the timeout. Must be a non-negative integer. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
 reuses one tab for the whole run instead of opening a tab per page. iOS honors
