@@ -279,8 +279,10 @@ interface IOSBridgeKnownOps extends BridgeCommonOps {
       value?: string;
     }>;
   }): Promise<'true'>;
-  /** Toggle the bridge's post-navigation retry behavior. */
+  /** Toggle explicit navigation recovery for this page. */
   setExplicitNavigationRecoveryEnabled(args: { enabled: boolean }): Promise<'true' | 'false'>;
+  /** Toggle the bridge hit-test bypass used by forced pointer actions. */
+  setHitTestBypassEnabled(args: { enabled: boolean }): Promise<'true' | 'false'>;
 }
 
 // Any op the connected bridge registers is callable. The index signature types that open surface.

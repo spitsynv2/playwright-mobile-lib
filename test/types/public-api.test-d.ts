@@ -126,8 +126,21 @@ test('bridge, appium, and browsing-mode extras are typed', async ({ page }) => {
   const nativeInput: 'true' = await page.bridge.nativeInput({
     actions: [{ type: 'fill', xpath: '//input', value: 'text' }],
   });
+  const navigationRecovery: 'true' | 'false' =
+    await page.bridge.setExplicitNavigationRecoveryEnabled({ enabled: true });
+  const hitTestBypass: 'true' | 'false' =
+    await page.bridge.setHitTestBypassEnabled({ enabled: true });
   const unregisteredOp: unknown = await page.bridge.someFutureOp({ a: 1 });
-  expect([sessionId, deviceInfoJson, inputMode, alert, nativeInput, unregisteredOp]).toBeTruthy();
+  expect([
+    sessionId,
+    deviceInfoJson,
+    inputMode,
+    alert,
+    nativeInput,
+    navigationRecovery,
+    hitTestBypass,
+    unregisteredOp,
+  ]).toBeTruthy();
 
   const reopened: Page = await page.setBrowsingMode('public', { timeoutMs: 1_000 });
   await withAppiumInputMode(reopened, async () => {
