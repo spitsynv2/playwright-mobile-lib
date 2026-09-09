@@ -40,7 +40,7 @@ function ensureAndroidPrototypesPatched(probePage) {
   // Android has no Appium input-mode flip. locator.appium.tap() calls the Playwright action.
   Object.defineProperty(PageProto, 'appium', {
     configurable: true,
-    get() { return makeAppiumProxy(this, this, 'page.appium', { flip: false }); },
+    get() { return makeAppiumProxy(this, this, 'page.appium', { appiumInputModeEnabled: false }); },
   });
 
   if (typeof probePage.locator === 'function') {
@@ -48,7 +48,7 @@ function ensureAndroidPrototypesPatched(probePage) {
     const LocatorProto = Object.getPrototypeOf(probeLocator);
     Object.defineProperty(LocatorProto, 'appium', {
       configurable: true,
-      get() { return makeAppiumProxy(this, this.page(), 'locator.appium', { flip: false }); },
+      get() { return makeAppiumProxy(this, this.page(), 'locator.appium', { appiumInputModeEnabled: false }); },
     });
   }
   patchedAndroidPrototypes.add(PageProto);

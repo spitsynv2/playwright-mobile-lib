@@ -6,7 +6,7 @@ const {
   resolveWsEndpoint,
   buildConnectHeaders,
   effectiveCapabilities,
-  gateFlag,
+  parseEnabledFlag,
   connectTimeoutMs,
   slowMoMs,
 } = require('../../core/capabilities');
@@ -172,19 +172,19 @@ function forwardedUseOptions(useOptions) {
   return opts;
 }
 
-const NO_TIMEOUT = { signal: undefined, timeout: 0 };
+const UNTIMED_CHANNEL_OPTIONS = { signal: undefined, timeout: 0 };
 
 // launchBrowser() skips selector registration that newContext() applies. Replay engines here.
 async function applyRegisteredSelectors(context) {
   const channel = context._channel;
   if (!channel || typeof channel.registerSelectorEngine !== 'function') return;
   for (const selectorEngine of selectors._selectorEngines || []) {
-    await channel.registerSelectorEngine({ selectorEngine }, NO_TIMEOUT);
+    await channel.registerSelectorEngine({ selectorEngine }, UNTIMED_CHANNEL_OPTIONS);
   }
   const testIdAttributeName = selectors._testIdAttributeName;
   if (!testIdAttributeName || typeof channel.setTestIdAttributeName !== 'function') return;
   context._options.testIdAttributeName = testIdAttributeName;
-  await channel.setTestIdAttributeName({ testIdAttributeName }, NO_TIMEOUT);
+  await channel.setTestIdAttributeName({ testIdAttributeName }, UNTIMED_CHANNEL_OPTIONS);
 }
 
 function buildLaunchBrowserOptions(caps) {
@@ -333,10 +333,10 @@ const driver = {
     const mode = normalizeBrowsingMode(caps.browsingMode);
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
-      const pruneTabsEnabled = gateFlag(caps.closeOpenedTabsAfterTest) !== false;
+      const pruneTabsEnabled = parseEnabledFlag(caps.closeOpenedTabsAfterTest) !== false;
       await connection.shell(`am force-stop ${pkg}`);
       // Restored tabs with no CDP target stay hidden from a sweep. Only pm clear removes them.
-      if (gateFlag(caps.resetBrowserDataAfterTest) === true) {
+      if (parseEnabledFlag(caps.resetBrowserDataAfterTest) === true) {
         try {
           await connection.shell(`pm clear ${pkg}`);
         } catch (error) {
@@ -349,7 +349,7 @@ const driver = {
         ...extraContextOptions,
       };
       // Playwright gates locator.tap on hasTouch. A physical device always has touch.
-      launchOptions.hasTouch = gateFlag(launchOptions.hasTouch) ?? true;
+      launchOptions.hasTouch = parseEnabledFlag(launchOptions.hasTouch) ?? true;
       const context = await connection.launchBrowser(launchOptions);
       await applyRegisteredSelectors(context);
       contextBrowserVersion.set(context, await readBrowserVersion(connection, pkg));

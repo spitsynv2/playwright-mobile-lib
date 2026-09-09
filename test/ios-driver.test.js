@@ -105,14 +105,14 @@ test('createPage returns the page when the bridge handshake is unavailable', asy
 
   const result = await driver.createPage(context, {
     deviceInfo: { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
-    reopenInMode: undefined,
+    reopenPageInModeBeforeTest: undefined,
     testInfo: {},
   });
 
   assert.equal(result, page, 'a missing bridge does not crash the fixture');
 });
 
-test('createPage keeps the current page when reopenInMode has no farm bridge', async () => {
+test('createPage keeps the current page when reopenPageInModeBeforeTest has no farm bridge', async () => {
   await withConnectEnv({}, async () => {
     const page = makeFullPage();
     const context = { async newPage() { return page; } };
@@ -121,7 +121,7 @@ test('createPage keeps the current page when reopenInMode has no farm bridge', a
     try {
       result = await driver.createPage(context, {
         deviceInfo: { deviceName: '', platformName: 'iOS', osVersion: '' },
-        reopenInMode: 'private',
+        reopenPageInModeBeforeTest: 'private',
         testInfo: {},
       });
     } finally {
@@ -150,7 +150,7 @@ test('createPage reopens into the tab the bridge adopts when setBrowsingMode suc
 
     const result = await driver.createPage(context, {
       deviceInfo: { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
-      reopenInMode: 'public',
+      reopenPageInModeBeforeTest: 'public',
       testInfo: {},
     });
 

@@ -155,7 +155,7 @@ test.describe('forced pointer actions', { concurrency: 1 }, () => {
 
       await page.tap({ force: true });
 
-      const sequence = calls.map((call) => (call[0] === 'evaluate' ? `bypass:${call[2].on}` : call[0]));
+      const sequence = calls.map((call) => (call[0] === 'evaluate' ? `bypass:${call[2].enabled}` : call[0]));
       assert.deepEqual(sequence, ['bypass:true', 'tap', 'bypass:false']);
     });
   });

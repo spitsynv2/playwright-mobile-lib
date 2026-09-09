@@ -16,7 +16,7 @@ no environment-variable fallbacks for device capabilities.
 | `resetBrowserDataAfterTest` | `boolean` | Android only: clear the browser package's data before each launch. Defaults to disabled. Enable it to reclaim tabs Chrome restored but never reloaded, at the cost of the profile. |
 | `explicitNavigationRecoveryEnabled` | `boolean` | iOS only: explicit-navigation recovery gate. Reissues a stuck explicit navigation. Defaults to disabled. |
 | `clickNavigationRetapRecoveryEnabled` | `boolean` | iOS only: click-navigation retap recovery gate. Repeats a trusted tap after a stalled click navigation. Defaults to disabled. |
-| `logLevels` | `Partial<Record<'bridge' \| 'pwserver' \| 'inspector', LogLevel>>` | Remote session log levels. iOS accepts all three sources. Android accepts `bridge` and `pwserver`. |
+| `logLevels` | `Partial<Record<'bridge' \| 'playwrightServer' \| 'inspector', LogLevel>>` | Remote session log levels. iOS accepts all three sources. Android accepts `bridge` and `playwrightServer`. |
 | `sessionIdleTimeoutMs` | `number` | Remote session idle timeout in milliseconds. Omit it to use the service default. `0` disables the timeout. Must be a non-negative integer. |
 
 `private` browses without persisting history or site data, and `single-tab-*`
@@ -137,6 +137,7 @@ const { test, expect } = require('playwright-mobile-lib');
 | `PLAYWRIGHT_MOBILE_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. The default is `120000`. The connection fixture adds 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
 | `PLAYWRIGHT_MOBILE_CLIENT_ID` | Stable `x-pwm-client-id` for device selection across reconnects. If absent, the default uses `TEST_PARALLEL_INDEX` and the runner process identifier. The legacy `IOS_CLIENT_ID` is still accepted. |
 | `PLAYWRIGHT_SLOW_MO_MS` | Non-negative delay between Playwright operations in milliseconds. Defaults to `0`. |
+| `REPORTING_ENABLED` | Enable the optional reporting adapter when set to `true`. Defaults to `false`. Present in the library's `.env.example`. |
 
 Put Basic authentication credentials in the endpoint URL:
 

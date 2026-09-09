@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
-  gateFlag,
+  parseEnabledFlag,
   effectiveCapabilities,
   resolveWsEndpoint,
   buildConnectHeaders,
@@ -41,25 +41,25 @@ function endpointWithCredentials(username, password) {
 }
 
 test('resolves booleans unchanged', () => {
-  assert.equal(gateFlag(true), true);
-  assert.equal(gateFlag(false), false);
+  assert.equal(parseEnabledFlag(true), true);
+  assert.equal(parseEnabledFlag(false), false);
 });
 
 test('resolves the string forms the orchestrator accepts', () => {
-  assert.equal(gateFlag('true'), true);
-  assert.equal(gateFlag('TRUE'), true);
-  assert.equal(gateFlag(' true '), true);
-  assert.equal(gateFlag('1'), true);
-  assert.equal(gateFlag('false'), false);
-  assert.equal(gateFlag('False'), false);
-  assert.equal(gateFlag('0'), false);
+  assert.equal(parseEnabledFlag('true'), true);
+  assert.equal(parseEnabledFlag('TRUE'), true);
+  assert.equal(parseEnabledFlag(' true '), true);
+  assert.equal(parseEnabledFlag('1'), true);
+  assert.equal(parseEnabledFlag('false'), false);
+  assert.equal(parseEnabledFlag('False'), false);
+  assert.equal(parseEnabledFlag('0'), false);
 });
 
 test('treats unset and unparseable values as unset', () => {
-  assert.equal(gateFlag(undefined), undefined);
-  assert.equal(gateFlag(null), undefined);
-  assert.equal(gateFlag(''), undefined);
-  assert.equal(gateFlag('maybe'), undefined);
+  assert.equal(parseEnabledFlag(undefined), undefined);
+  assert.equal(parseEnabledFlag(null), undefined);
+  assert.equal(parseEnabledFlag(''), undefined);
+  assert.equal(parseEnabledFlag('maybe'), undefined);
 });
 
 test('accepts every browsing mode the servers recognize', () => {

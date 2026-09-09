@@ -117,7 +117,7 @@ const driver = {
     return context;
   },
 
-  async createPage(context, { deviceInfo, reopenInMode }) {
+  async createPage(context, { deviceInfo, reopenPageInModeBeforeTest }) {
     let page = await recordAction('fixture', 'fixture.page.create', {}, () => context.newPage());
     ensureAppiumPrototypesPatched(page);
 
@@ -157,7 +157,7 @@ const driver = {
     attachDeviceLabel(resolvedDeviceInfo.deviceName);
 
     // If `setBrowsingMode` fails, keep the current page.
-    const mode = reopenInMode && String(reopenInMode).toLowerCase();
+    const mode = reopenPageInModeBeforeTest && String(reopenPageInModeBeforeTest).toLowerCase();
     if (mode === 'private' || mode === 'public') {
       try {
         page = await page.setBrowsingMode(mode);

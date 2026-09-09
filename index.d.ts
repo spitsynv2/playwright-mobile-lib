@@ -52,7 +52,7 @@ export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | '
 export type GateFlag = boolean | 'true' | 'false' | (string & {});
 
 /** Remote session log sources. `inspector` is iOS-only. */
-export type SessionLogName = 'bridge' | 'pwserver' | 'inspector';
+export type SessionLogName = 'bridge' | 'playwrightServer' | 'inspector';
 
 /**
  * Tab mode at connect time. The default is `private`.
@@ -148,7 +148,7 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   explicitNavigationRecoveryEnabled?: GateFlag;
   /** iOS: click-navigation retap recovery gate. Repeats a trusted tap after a stalled click navigation. Defaults to disabled. */
   clickNavigationRetapRecoveryEnabled?: GateFlag;
-  /** Remote session log levels. Android uses `bridge` and `pwserver`, and `inspector` is iOS-only. */
+  /** Remote session log levels. Android uses `bridge` and `playwrightServer`, and `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
   /**
    * Idle timeout in milliseconds for this remote device session.
@@ -189,7 +189,7 @@ export interface MobileWorkerFixtures {
 /** Test-scoped options added by this library. */
 export interface MobileTestOptions {
   /** iOS only: reopen `page` in a fresh tab of this mode before the test body. */
-  reopenInMode: 'private' | 'public' | undefined;
+  reopenPageInModeBeforeTest: 'private' | 'public' | undefined;
   /** Extra options the fixture merges into the context (iOS `newContext` / Android `launchBrowser`). */
   extraContextOptions: BrowserContextOptions;
 }
@@ -213,7 +213,7 @@ type MobilePlaywrightWorkerArgs = Omit<PlaywrightWorkerArgs, 'browser'> & {
 
 /**
  * Cross-platform Playwright `test`. `capabilities.platformName` selects iOS Safari or Android Chrome.
- * `page.bridge` exists on both platforms. `page.appium`, `page.setBrowsingMode`, and `reopenInMode` are iOS-only.
+ * `page.bridge` exists on both platforms. `page.appium`, `page.setBrowsingMode`, and `reopenPageInModeBeforeTest` are iOS-only.
  */
 export const test: TestType<
   PlaywrightTestArgs & PlaywrightTestOptions & MobileTestOptions,
@@ -280,7 +280,7 @@ interface IOSBridgeKnownOps extends BridgeCommonOps {
     }>;
   }): Promise<'true'>;
   /** Toggle the bridge's post-navigation retry behavior. */
-  setNavRetries(args: { enabled: boolean }): Promise<'true' | 'false'>;
+  setExplicitNavigationRecoveryEnabled(args: { enabled: boolean }): Promise<'true' | 'false'>;
 }
 
 // Any op the connected bridge registers is callable. The index signature types that open surface.
@@ -297,7 +297,7 @@ declare module '@playwright/test' {
 
   interface PlaywrightTestOptions {
     /** iOS only: reopen `page` in a fresh tab of this mode before the test body. */
-    reopenInMode: 'private' | 'public' | undefined;
+    reopenPageInModeBeforeTest: 'private' | 'public' | undefined;
     /** Extra options the fixture merges into the context (iOS `newContext` / Android `launchBrowser`). */
     extraContextOptions: BrowserContextOptions;
   }
@@ -317,7 +317,7 @@ declare module '@playwright/test' {
      * iOS only: switch the Safari browsing mode.
      * On a device, use the returned `Page`. A local pre-flight returns the same page.
      */
-    setBrowsingMode(mode: 'private' | 'public', options?: { timeout?: number }): Promise<Page>;
+    setBrowsingMode(mode: 'private' | 'public', options?: { timeoutMs?: number }): Promise<Page>;
 
     /** @deprecated Page.setViewportSize() is unsupported on this device — physical device viewport — use device-pool selection instead. Throws at runtime. */
     setViewportSize: CorePage['setViewportSize'];

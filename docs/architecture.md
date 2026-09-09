@@ -39,7 +39,7 @@ specifics.
 Option fixtures:
 
 - `capabilities` — worker option. The desired device and mode.
-- `reopenInMode` — test option. iOS only. Reopen the page in a fresh tab.
+- `reopenPageInModeBeforeTest` — test option. iOS only. Reopen the page in a fresh tab.
 - `extraContextOptions` — test option. Extra context options for the fixture
   context.
 

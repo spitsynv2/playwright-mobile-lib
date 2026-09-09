@@ -5,9 +5,12 @@ const { selectDriver } = require('./platforms');
 const { defaultCapabilities, connectTimeoutMs } = require('./core/capabilities');
 const { warnUnsupportedUseOptions } = require('./core/use-guard');
 
+// Extra time beyond the connect timeout for the worker to bring up its device session.
+const WORKER_CONNECT_GRACE_MS = 30_000;
+
 const test = base.extend({
   /** iOS only. Reopen page in this browsing mode before the test body. */
-  reopenInMode: [undefined, { option: true }],
+  reopenPageInModeBeforeTest: [undefined, { option: true }],
 
   /** Desired capabilities for this project. The orchestrator matches a free device. */
   capabilities: [defaultCapabilities, { option: true, scope: 'worker' }],
@@ -28,7 +31,7 @@ const test = base.extend({
     } finally {
       await _driver.disconnect(connection);
     }
-  }, { scope: 'worker', timeout: connectTimeoutMs + 30_000 }],
+  }, { scope: 'worker', timeout: connectTimeoutMs + WORKER_CONNECT_GRACE_MS }],
 
   /** Farm browser from the platform connection. */
   browser: [async ({ _driver, _connection }, use) => {
@@ -73,8 +76,8 @@ const test = base.extend({
     }
   },
 
-  page: async ({ _driver, context, deviceInfo, reopenInMode }, use, testInfo) => {
-    const page = await _driver.createPage(context, { deviceInfo, reopenInMode, testInfo });
+  page: async ({ _driver, context, deviceInfo, reopenPageInModeBeforeTest }, use, testInfo) => {
+    const page = await _driver.createPage(context, { deviceInfo, reopenPageInModeBeforeTest, testInfo });
     try {
       await use(page);
     } finally {

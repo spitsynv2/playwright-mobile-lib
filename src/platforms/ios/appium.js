@@ -28,26 +28,26 @@ async function withAppiumInputMode(page, fn) {
   }
 }
 
-function setHitTestBypass(page, on) {
-  return bridgeCall(page, 'setHitTestBypass', { on });
+function setHitTestBypassEnabled(page, enabled) {
+  return bridgeCall(page, 'setHitTestBypassEnabled', { enabled });
 }
 
 /** Disables the bridge hit-test block for one forced pointer action. */
 async function withHitTestBypass(page, fn) {
   if (!hasFarmBridge('iOS')) return fn();
-  const prev = await setHitTestBypass(page, true);
+  const prev = await setHitTestBypassEnabled(page, true);
   try {
     return await fn();
   } finally {
-    await setHitTestBypass(page, prev === true || prev === 'true');
+    await setHitTestBypassEnabled(page, prev === true || prev === 'true');
   }
 }
 
 /**
  * Forwards Page or Locator methods. Optionally sets Appium input mode for each call.
- * @param {boolean} [options.flip=true] Set false to skip the input-mode flip.
+ * @param {boolean} [options.appiumInputModeEnabled=true] Set false to skip the input-mode flip.
  */
-function makeAppiumProxy(receiver, page, path = 'page.appium', { flip = true } = {}) {
+function makeAppiumProxy(receiver, page, path = 'page.appium', { appiumInputModeEnabled = true } = {}) {
   return new Proxy({}, {
     get(_, prop) {
       const target = receiver[prop];
@@ -55,13 +55,13 @@ function makeAppiumProxy(receiver, page, path = 'page.appium', { flip = true } =
       if (typeof target === 'function') {
         return (...args) =>
           recordAction('appium', methodPath, { args }, () =>
-            flip
+            appiumInputModeEnabled
               ? withAppiumInputMode(page, () => target.apply(receiver, args))
               : target.apply(receiver, args),
           );
       }
       if (target && typeof target === 'object') {
-        return makeAppiumProxy(target, page, methodPath, { flip });
+        return makeAppiumProxy(target, page, methodPath, { appiumInputModeEnabled });
       }
       return target;
     },
@@ -73,7 +73,7 @@ module.exports = {
   bridgeCall,
   setInputMode,
   withAppiumInputMode,
-  setHitTestBypass,
+  setHitTestBypassEnabled,
   withHitTestBypass,
   makeAppiumProxy,
 };

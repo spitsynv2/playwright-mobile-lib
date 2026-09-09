@@ -76,7 +76,7 @@ const iosCapabilities: Capabilities = {
   closeOpenedTabsAfterTest: false,
   explicitNavigationRecoveryEnabled: true,
   clickNavigationRetapRecoveryEnabled: false,
-  logLevels: { bridge: 'debug', pwserver: 'off', inspector: 'info' },
+  logLevels: { bridge: 'debug', playwrightServer: 'off', inspector: 'info' },
 };
 
 // A device outside the suggested union is still accepted.
@@ -105,7 +105,7 @@ export default defineConfig({
     { name: 'android', use: { capabilities: androidCapabilities } },
     {
       name: 'ios',
-      use: { capabilities: iosCapabilities, reopenInMode: 'private', extraContextOptions: {} },
+      use: { capabilities: iosCapabilities, reopenPageInModeBeforeTest: 'private', extraContextOptions: {} },
     },
     { name: 'other', use: { capabilities: otherDevice } },
     { name: 'legacy', use: { capabilities: legacyMode } },
@@ -129,7 +129,7 @@ test('bridge, appium, and browsing-mode extras are typed', async ({ page }) => {
   const unregisteredOp: unknown = await page.bridge.someFutureOp({ a: 1 });
   expect([sessionId, deviceInfoJson, inputMode, alert, nativeInput, unregisteredOp]).toBeTruthy();
 
-  const reopened: Page = await page.setBrowsingMode('public', { timeout: 1_000 });
+  const reopened: Page = await page.setBrowsingMode('public', { timeoutMs: 1_000 });
   await withAppiumInputMode(reopened, async () => {
     await reopened.getByRole('button').appium.tap();
   });
@@ -222,5 +222,5 @@ export const extendedConfig = defineConfig<AppOptions>({
 // The merge form takes more than one config.
 export const mergedConfig = defineConfig(
   { use: { capabilities: iosCapabilities } },
-  { projects: [{ name: 'override', use: { reopenInMode: 'public' } }] },
+  { projects: [{ name: 'override', use: { reopenPageInModeBeforeTest: 'public' } }] },
 );

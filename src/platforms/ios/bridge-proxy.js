@@ -112,9 +112,9 @@ function ensureAppiumPrototypesPatched(probePage) {
     value: function (mode, options = {}) {
       return recordAction('fixture', 'page.setBrowsingMode', { mode, options }, async () => {
         if (!hasFarmBridge('iOS')) return this;
-        const timeout = options.timeout ?? 60_000;
+        const timeoutMs = options.timeoutMs ?? 60_000;
         const [newPage] = await Promise.all([
-          this.context().waitForEvent('page', { timeout }),
+          this.context().waitForEvent('page', { timeout: timeoutMs }),
           bridgeCall(this, 'setBrowsingMode', { mode }),
         ]);
         return newPage;

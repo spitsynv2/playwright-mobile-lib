@@ -17,7 +17,7 @@ const FARM = { PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/session
 
 // A fake iOS bridge page: page.evaluate(sentinel) is the in-process RPC. The
 // page tracks the current input mode and hit-test flag so setInputMode /
-// setHitTestBypass can return the prior value the real bridge returns.
+// setHitTestBypassEnabled can return the prior value the real bridge returns.
 function fakeBridgePage({ evalError, failTimes = 0 } = {}) {
   const calls = [];
   let mode = 'js';
@@ -40,9 +40,9 @@ function fakeBridgePage({ evalError, failTimes = 0 } = {}) {
         mode = request.args.mode;
         return prev;
       }
-      if (request.op === 'setHitTestBypass') {
+      if (request.op === 'setHitTestBypassEnabled') {
         const prev = hitBypass;
-        hitBypass = request.args.on;
+        hitBypass = request.args.enabled;
         return prev;
       }
       return { ok: true, op: request.op, modeSeen: mode };
@@ -124,9 +124,9 @@ test.describe('farm iOS bridge RPC', { concurrency: 1 }, () => {
       await withHitTestBypass(page, async () => {
         bypassDuringCall = page.calls[page.calls.length - 1];
       });
-      assert.deepEqual(bypassDuringCall, { op: 'setHitTestBypass', args: { on: true } });
+      assert.deepEqual(bypassDuringCall, { op: 'setHitTestBypassEnabled', args: { enabled: true } });
       assert.deepEqual(
-        page.calls.map((call) => call.args.on),
+        page.calls.map((call) => call.args.enabled),
         [true, false],
         'the bypass is turned off again after the body',
       );
@@ -174,7 +174,7 @@ test('withHitTestBypass on a local pre-flight runs the body without a sentinel R
   });
 });
 
-test('makeAppiumProxy with flip:false forwards the call without touching the bridge', async () => {
+test('makeAppiumProxy with appiumInputModeEnabled:false forwards the call without touching the bridge', async () => {
   const page = fakeBridgePage();
   const modesSeen = [];
   const receiver = {
@@ -183,7 +183,7 @@ test('makeAppiumProxy with flip:false forwards the call without touching the bri
       async down() { modesSeen.push(['mouse.down', page.currentMode()]); return 'down'; },
     },
   };
-  const proxy = makeAppiumProxy(receiver, page, 'page.appium', { flip: false });
+  const proxy = makeAppiumProxy(receiver, page, 'page.appium', { appiumInputModeEnabled: false });
 
   assert.deepEqual(await proxy.tap({ force: true }), [{ force: true }]);
   assert.equal(await proxy.mouse.down(), 'down');

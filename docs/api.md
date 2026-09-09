@@ -5,7 +5,7 @@
 | Fixture | Scope | Meaning |
 | --- | --- | --- |
 | `capabilities` | worker option | Desired capabilities for the run. |
-| `reopenInMode` | test option | iOS only: reopen `page` in a fresh `private` or `public` tab before the test body. Ignored on Android. |
+| `reopenPageInModeBeforeTest` | test option | iOS only: reopen `page` in a fresh `private` or `public` tab before the test body. Ignored on Android. |
 | `extraContextOptions` | test option | Extra `BrowserContextOptions` merged into context creation. |
 | `browser` | worker, read-only | The worker's browser connection, replacing Playwright's built-in fixture so no local browser is launched alongside the device. |
 | `device` | worker, read-only | Android device runs only: the `AndroidDevice` behind the run, for native UI outside the web contents. Throws on iOS and on a local pre-flight run. |
@@ -45,7 +45,7 @@ These additions are platform-specific:
 | `page.appium.<method>(...)` / `locator.appium.<method>(...)` | iOS device: Appium input mode. iOS pre-flight and Android: Playwright action. |
 | `page.setBrowsingMode('private' \| 'public')` | iOS device: a new tab. iOS pre-flight: the same page. |
 | `withAppiumInputMode(page, fn)` | iOS device: Appium input mode for the body. iOS pre-flight: runs `fn` with no flip. |
-| `reopenInMode` | iOS only. Ignored on Android |
+| `reopenPageInModeBeforeTest` | iOS only. Ignored on Android |
 | `resolveIOSDevicePreset()` | iOS only |
 | `browser` fixture | iOS and local pre-flight runs. Throws on an Android device run |
 | `device` fixture | Android device runs only. Throws on iOS and on local pre-flight runs |
@@ -104,7 +104,7 @@ await submit.tap();
 Covered JS taps and clicks wait for the target to become actionable. A forced
 tap or click temporarily bypasses the hit test, so use `force` only when the test
 intentionally needs that behavior. On an iOS device the library sends
-`setHitTestBypass` for that call. On a local pre-flight it uses Playwright
+`setHitTestBypassEnabled` for that call. On a local pre-flight it uses Playwright
 `force` only. Appium taps use native coordinates and do not retarget through an
 overlay.
 
@@ -149,7 +149,7 @@ The exported `test` is a standard Playwright `TestType`. Consumers can call
 `test.extend(...)`, combine fixture-bearing tests with the re-exported Playwright
 `mergeTests(mobileTest, anotherTest)`, and use ordinary Page Object Models.
 Option fixtures can be overridden with
-`test.use({ capabilities, extraContextOptions, reopenInMode })` or under `use` in
+`test.use({ capabilities, extraContextOptions, reopenPageInModeBeforeTest })` or under `use` in
 this package's `defineConfig()`.
 
 `defineConfig()` mirrors Playwright's own signatures, so a consumer option

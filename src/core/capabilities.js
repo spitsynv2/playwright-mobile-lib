@@ -1,21 +1,21 @@
 /** Resolve farm connection settings and connect headers from environment and capabilities. */
-const SESSION_LOG_NAMES = ['bridge', 'pwserver', 'inspector'];
+const SESSION_LOG_NAMES = ['bridge', 'playwrightServer', 'inspector'];
 const VALID_LOG_LEVELS = new Set(['off', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']);
 
-function logLevelOff(name, level) {
-  if (level === undefined || level === null || level === '') return false;
+function isSessionLogLevelEnabled(name, level) {
+  if (level === undefined || level === null || level === '') return true;
   const v = String(level).trim().toLowerCase();
   if (!VALID_LOG_LEVELS.has(v)) {
     console.warn(`reporting-agent: unknown logLevels.${name}='${level}', treating as on`);
-    return false;
+    return true;
   }
-  return v === 'off';
+  return v !== 'off';
 }
 
 /** Return session log names that are not set to off. Launcher lines can still appear. */
-function activeSessionLogs(capabilities) {
+function enabledSessionLogNames(capabilities) {
   const levels = (capabilities && capabilities.logLevels) || {};
-  return SESSION_LOG_NAMES.filter((name) => !logLevelOff(name, levels[name]));
+  return SESSION_LOG_NAMES.filter((name) => isSessionLogLevelEnabled(name, levels[name]));
 }
 
 // Strip a query string. An empty value means no farm.
@@ -90,7 +90,7 @@ function effectiveCapabilities(capabilities) {
 }
 
 // Parse boolean and the quoted true or false forms. Match the orchestrator.
-function gateFlag(value) {
+function parseEnabledFlag(value) {
   if (typeof value === 'boolean') return value;
   const v = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
   if (v === 'true' || v === '1') return true;
@@ -157,8 +157,8 @@ module.exports = {
   buildConnectHeaders,
   defaultCapabilities,
   effectiveCapabilities,
-  gateFlag,
-  activeSessionLogs,
+  parseEnabledFlag,
+  enabledSessionLogNames,
   slowMoMs,
   connectTimeoutMs,
   clientId,
