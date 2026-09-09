@@ -1,7 +1,7 @@
 /** Connects WebKit to the orchestrator or launches it locally. */
 const { webkit, devices } = require('@playwright/test');
 
-const { resolveIOSDevicePreset } = require('./custom-devices');
+const { resolveIOSDevicePreset, resolveIOSVersion } = require('./custom-devices');
 const {
   attachSessionCapabilities,
   attachDeviceLabel,
@@ -128,11 +128,24 @@ const driver = {
     try {
       sessionId = await page.bridge.getSessionId();
     } catch {}
-    if (sessionId) {
-      const reportingCapabilities = buildSessionCapabilities('iOS', resolvedDeviceInfo);
-      attachSessionCapabilities(sessionId, reportingCapabilities);
-      attachDeviceLabel(resolvedDeviceInfo.deviceName);
+
+    // A real device reports the live OS version through the bridge. A local
+    // pre-flight has no bridge session, so fall back to the emulated device's
+    // catalog OS version. Without this the reporter shows "Platform: iOS" with
+    // no version for a pre-flight, while a device run shows "Platform: iOS 27.0".
+    if (!resolvedDeviceInfo.osVersion && resolvedDeviceInfo.deviceName) {
+      const catalogVersion = resolveIOSVersion(resolvedDeviceInfo.deviceName);
+      if (catalogVersion) {
+        resolvedDeviceInfo = { ...resolvedDeviceInfo, osVersion: catalogVersion };
+      }
     }
+
+    // Attach session capabilities for both device and pre-flight runs so the
+    // reporter shows accurate Browser/Platform data in either mode. sessionId is
+    // empty on a pre-flight; the reporter still records the attached capabilities.
+    const reportingCapabilities = buildSessionCapabilities('iOS', resolvedDeviceInfo);
+    attachSessionCapabilities(sessionId, reportingCapabilities);
+    attachDeviceLabel(resolvedDeviceInfo.deviceName);
 
     // If `setBrowsingMode` fails, keep the current page.
     const mode = reopenInMode && String(reopenInMode).toLowerCase();
