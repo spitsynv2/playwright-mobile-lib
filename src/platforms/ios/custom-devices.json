@@ -1,11 +1,38 @@
 {
   "devices": {
-    "iPhone 16": {
-      "extends": "iPhone 15",
-      "aliases": ["iphone 16"]
+    "iPad (9th gen)": {
+      "extends": "iPad (gen 7)"
     },
-    "iPhone 16 landscape": {
-      "extends": "iPhone 15 landscape"
+    "iPad Air": {
+      "extends": "iPad Pro 11",
+      "override": {
+        "deviceScaleFactor": 2,
+        "screen": {
+          "width": 820,
+          "height": 1180
+        },
+        "viewport": {
+          "width": 820,
+          "height": 1180
+        }
+      }
+    },
+    "iPad mini (6th gen)": {
+      "extends": "iPad Pro 11",
+      "override": {
+        "deviceScaleFactor": 2,
+        "screen": {
+          "width": 744,
+          "height": 1133
+        },
+        "viewport": {
+          "width": 744,
+          "height": 1133
+        }
+      }
+    },
+    "iPhone 16": {
+      "extends": "iPhone 15"
     },
     "iPhone 16 Plus": {
       "extends": "iPhone 15 Plus"
@@ -13,8 +40,110 @@
     "iPhone 16 Plus landscape": {
       "extends": "iPhone 15 Plus landscape"
     },
+    "iPhone 16 Pro": {
+      "extends": "iPhone 15 Pro",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 402,
+          "height": 874
+        },
+        "viewport": {
+          "width": 402,
+          "height": 681
+        }
+      }
+    },
+    "iPhone 16 Pro Max": {
+      "extends": "iPhone 15 Pro Max",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 440,
+          "height": 956
+        },
+        "viewport": {
+          "width": 440,
+          "height": 763
+        }
+      }
+    },
+    "iPhone 16 landscape": {
+      "extends": "iPhone 15 landscape"
+    },
+    "iPhone 16e": {
+      "extends": "iPhone 14"
+    },
+    "iPhone 17": {
+      "extends": "iPhone 15",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 402,
+          "height": 874
+        },
+        "viewport": {
+          "width": 402,
+          "height": 681
+        }
+      }
+    },
+    "iPhone 17 Air": {
+      "extends": "iPhone 15",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 420,
+          "height": 912
+        },
+        "viewport": {
+          "width": 420,
+          "height": 719
+        }
+      }
+    },
+    "iPhone 17 Pro": {
+      "extends": "iPhone 15 Pro",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 402,
+          "height": 874
+        },
+        "viewport": {
+          "width": 402,
+          "height": 681
+        }
+      }
+    },
+    "iPhone 17 Pro Max": {
+      "extends": "iPhone 15 Pro Max",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 440,
+          "height": 956
+        },
+        "viewport": {
+          "width": 440,
+          "height": 763
+        }
+      }
+    },
+    "iPhone SE": {
+      "extends": "iPhone SE (3rd gen)"
+    },
+    "iPhone SE (2nd gen)": {
+      "extends": "iPhone SE (3rd gen)"
+    },
     "iPhone XR": {
-      "aliases": ["iphone xr", "xr"]
+      "extends": "iPhone XR",
+      "aliases": [
+        "xr"
+      ]
+    },
+    "iPhone XS": {
+      "extends": "iPhone 11 Pro"
     }
   }
 }

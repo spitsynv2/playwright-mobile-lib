@@ -1,4 +1,487 @@
 {
   "devices": {
+    "Galaxy A14 5G": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 856
+        },
+        "viewport": {
+          "width": 384,
+          "height": 856
+        }
+      }
+    },
+    "Galaxy A53": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 853
+        },
+        "viewport": {
+          "width": 384,
+          "height": 853
+        }
+      }
+    },
+    "Galaxy A53 5G": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 853
+        },
+        "viewport": {
+          "width": 384,
+          "height": 853
+        }
+      }
+    },
+    "Galaxy A54": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy A54 5G": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy A56 5G": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy Note10+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.625,
+        "screen": {
+          "width": 411,
+          "height": 869
+        },
+        "viewport": {
+          "width": 411,
+          "height": 869
+        }
+      }
+    },
+    "Galaxy Note20 Ultra": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.625,
+        "screen": {
+          "width": 411,
+          "height": 882
+        },
+        "viewport": {
+          "width": 411,
+          "height": 882
+        }
+      }
+    },
+    "Galaxy S10+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.625,
+        "screen": {
+          "width": 411,
+          "height": 869
+        },
+        "viewport": {
+          "width": 411,
+          "height": 869
+        }
+      }
+    },
+    "Galaxy S20": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 360,
+          "height": 800
+        },
+        "viewport": {
+          "width": 360,
+          "height": 800
+        }
+      }
+    },
+    "Galaxy S20 5G": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 360,
+          "height": 800
+        },
+        "viewport": {
+          "width": 360,
+          "height": 800
+        }
+      }
+    },
+    "Galaxy S20 FE": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 360,
+          "height": 800
+        },
+        "viewport": {
+          "width": 360,
+          "height": 800
+        }
+      }
+    },
+    "Galaxy S20+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 853
+        },
+        "viewport": {
+          "width": 384,
+          "height": 853
+        }
+      }
+    },
+    "Galaxy S21": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 3,
+        "screen": {
+          "width": 360,
+          "height": 800
+        },
+        "viewport": {
+          "width": 360,
+          "height": 800
+        }
+      }
+    },
+    "Galaxy S21 Ultra": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 853
+        },
+        "viewport": {
+          "width": 384,
+          "height": 853
+        }
+      }
+    },
+    "Galaxy S21+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 853
+        },
+        "viewport": {
+          "width": 384,
+          "height": 853
+        }
+      }
+    },
+    "Galaxy S22": {
+      "extends": "Galaxy S24"
+    },
+    "Galaxy S22 Ultra": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 823
+        },
+        "viewport": {
+          "width": 384,
+          "height": 823
+        }
+      }
+    },
+    "Galaxy S22+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy S23": {
+      "extends": "Galaxy S24"
+    },
+    "Galaxy S23 FE": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy S23 Ultra": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 3.75,
+        "screen": {
+          "width": 384,
+          "height": 823
+        },
+        "viewport": {
+          "width": 384,
+          "height": 823
+        }
+      }
+    },
+    "Galaxy S23+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy S24 Ultra": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy S24+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy S25": {
+      "extends": "Galaxy S24"
+    },
+    "Galaxy S25 Ultra": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy S25+": {
+      "extends": "Galaxy S24",
+      "override": {
+        "deviceScaleFactor": 2.8125,
+        "screen": {
+          "width": 384,
+          "height": 832
+        },
+        "viewport": {
+          "width": 384,
+          "height": 832
+        }
+      }
+    },
+    "Galaxy Tab S7 FE 5G": {
+      "extends": "Galaxy Tab S9",
+      "override": {
+        "deviceScaleFactor": 2.125,
+        "screen": {
+          "width": 753,
+          "height": 1205
+        },
+        "viewport": {
+          "width": 753,
+          "height": 1205
+        }
+      }
+    },
+    "Pixel 3 XL": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 3.5,
+        "screen": {
+          "width": 411,
+          "height": 846
+        },
+        "viewport": {
+          "width": 411,
+          "height": 846
+        }
+      }
+    },
+    "Pixel 5a": {
+      "extends": "Pixel 7"
+    },
+    "Pixel 6 Pro": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 3.5,
+        "screen": {
+          "width": 411,
+          "height": 891
+        },
+        "viewport": {
+          "width": 411,
+          "height": 891
+        }
+      }
+    },
+    "Pixel 6a": {
+      "extends": "Pixel 7"
+    },
+    "Pixel 7a": {
+      "extends": "Pixel 7"
+    },
+    "Pixel 8": {
+      "extends": "Pixel 7"
+    },
+    "Pixel 8 Pro": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 2.25,
+        "screen": {
+          "width": 448,
+          "height": 997
+        },
+        "viewport": {
+          "width": 448,
+          "height": 997
+        }
+      }
+    },
+    "Pixel 9": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 2.625,
+        "screen": {
+          "width": 411,
+          "height": 923
+        },
+        "viewport": {
+          "width": 411,
+          "height": 923
+        }
+      }
+    },
+    "Pixel 9 Pro": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 2.25,
+        "screen": {
+          "width": 427,
+          "height": 952
+        },
+        "viewport": {
+          "width": 427,
+          "height": 952
+        }
+      }
+    },
+    "Pixel 9 Pro XL": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 2.25,
+        "screen": {
+          "width": 448,
+          "height": 997
+        },
+        "viewport": {
+          "width": 448,
+          "height": 997
+        }
+      }
+    },
+    "Xiaomi 14 Ultra": {
+      "extends": "Pixel 7",
+      "override": {
+        "deviceScaleFactor": 3.5,
+        "screen": {
+          "width": 411,
+          "height": 914
+        },
+        "viewport": {
+          "width": 411,
+          "height": 914
+        }
+      }
+    }
   }
 }
