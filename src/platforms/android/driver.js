@@ -253,13 +253,7 @@ async function connectAdb(caps) {
   return list[0];
 }
 
-/**
- * Parse the Android and Chrome versions from a Chromium user agent, e.g.
- * "...Linux; Android 14; Pixel 7... Chrome/145.0.7632.6 Mobile Safari/537.36".
- * A local pre-flight runs Playwright's bundled Chromium, whose Chrome version
- * tracks the installed Playwright build; the Android OS token is frozen per
- * device model in Playwright's descriptors.
- */
+/** Parse the Android and Chrome versions from a Chromium user agent. */
 function parseChromiumVersions(userAgent) {
   const ua = typeof userAgent === 'string' ? userAgent : '';
   const osMatch = /Android (\d+(?:\.\d+)*)/.exec(ua);
@@ -272,8 +266,7 @@ function parseChromiumVersions(userAgent) {
 
 const contextBrowserVersion = new WeakMap();
 
-// Local pre-flight (chromium.launch) contexts. Reporting versions are derived
-// from the preset user agent for these only; real device/ADB runs are untouched.
+// Local pre-flight (chromium.launch) contexts; used to scope UA-derived versions.
 const preflightContexts = new WeakSet();
 
 // ArtifactsRecorder skips launchBrowser() contexts. Capture screenshots in onPageTeardown.
@@ -466,10 +459,8 @@ const driver = {
       sessionId = await page.bridge.getSessionId();
     } catch {}
 
-    // A real Android device carries both an Android version (bridge) and a
-    // Chrome version (adb). A local pre-flight has neither source, so derive
-    // both from the resolved device preset's Chromium user agent. A real
-    // device/ADB run keeps its live values and is never touched here.
+    // A pre-flight has no bridge or adb, so derive both versions from the preset
+    // UA. A device/ADB run keeps its live values and is not touched here.
     if (preflightContexts.has(context)) {
       const preset = resolveAndroidDevicePreset(resolvedDeviceInfo.deviceName);
       const { osVersion, browserVersion: chromeVersion } = parseChromiumVersions(preset && preset.userAgent);
@@ -480,9 +471,7 @@ const driver = {
       };
     }
 
-    // Attach for both device and pre-flight runs so the reporter shows accurate
-    // Browser/Platform data in either mode. sessionId is empty on a pre-flight;
-    // the reporter still records the attached capabilities.
+    // Attach on device and pre-flight; sessionId is empty on a pre-flight.
     const reportingCapabilities = buildSessionCapabilities('Android', resolvedDeviceInfo);
     attachSessionCapabilities(sessionId, reportingCapabilities);
     attachDeviceLabel(resolvedDeviceInfo.deviceName);

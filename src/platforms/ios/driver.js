@@ -24,13 +24,7 @@ const { recordAction } = require('../../core/telemetry');
 // Fallback Playwright preset when the requested device name is unknown.
 const DEFAULT_LOCAL_IOS_DEVICE = 'iPhone 16 Plus';
 
-/**
- * Parse the iOS and Safari versions from a WebKit user agent, e.g.
- * "...CPU iPhone OS 17_5 like Mac OS X... Version/26.0 ... Safari/604.1".
- * A local pre-flight runs Playwright's bundled WebKit, whose reported versions
- * change between Playwright releases, so this is read at run time instead of
- * hard-coded in the device catalog.
- */
+/** Parse the iOS and Safari versions from a WebKit user agent. */
 function parseWebKitVersions(userAgent) {
   const ua = typeof userAgent === 'string' ? userAgent : '';
   const osMatch = /OS (\d+(?:_\d+)+)/.exec(ua);
@@ -146,12 +140,8 @@ const driver = {
       sessionId = await page.bridge.getSessionId();
     } catch {}
 
-    // A real device reports the live OS version through the bridge and carries
-    // only a platform version (no browser version). To match that shape on a
-    // local pre-flight, report the WebKit/Safari version (e.g. 26.0) as the
-    // platform version. It is read from the resolved preset's user agent, so it
-    // tracks the installed Playwright build. The preset's iOS OS token (e.g.
-    // 17.5) is frozen per device model and misleading, so it is not used.
+    // A device reports the OS version through the bridge. A pre-flight has none,
+    // so report the WebKit version as the platform version to match the shape.
     if (!resolvedDeviceInfo.osVersion) {
       const preset = resolveIOSDevicePreset(resolvedDeviceInfo.deviceName, devices)
         || resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices);
@@ -161,9 +151,7 @@ const driver = {
       }
     }
 
-    // Attach session capabilities for both device and pre-flight runs so the
-    // reporter shows accurate Browser/Platform data in either mode. sessionId is
-    // empty on a pre-flight; the reporter still records the attached capabilities.
+    // Attach on device and pre-flight; sessionId is empty on a pre-flight.
     const reportingCapabilities = buildSessionCapabilities('iOS', resolvedDeviceInfo);
     attachSessionCapabilities(sessionId, reportingCapabilities);
     attachDeviceLabel(resolvedDeviceInfo.deviceName);

@@ -6,9 +6,7 @@ const {
   resolvePreset,
 } = require('../../core/device-catalog');
 
-// The overlay only maps a device name to the nearest Playwright preset for
-// local pre-flight. The OS version is not stored here: a real device reports it
-// through the bridge, and a pre-flight derives it from the WebKit user agent.
+// Overlay that maps a device name to the nearest Playwright preset.
 const catalog = buildCatalog(catalogConfig);
 
 function getIOSDeviceCatalog(playwrightDevices) {
