@@ -1,6 +1,6 @@
 'use strict';
 
-const ENDPOINT_KEYS = ['IOS_WS_ENDPOINT', 'ANDROID_WS_ENDPOINT', 'PWM_ORCHESTRATOR'];
+const ENDPOINT_KEYS = ['PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT'];
 
 async function withConnectEnv(vars, fn) {
   const saved = new Map();

@@ -38,7 +38,7 @@ test('shouldCaptureVideo follows the mode and retry index', () => {
 });
 
 test('preflightVideoOptions returns recordVideo only on a local pre-flight', async () => {
-  await withConnectEnv({ PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' }, () => {
+  await withConnectEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, () => {
     assert.equal(preflightVideoOptions('iOS', { video: 'on' }, {}, fakeTestInfo()), null);
   });
   await withConnectEnv({}, () => {

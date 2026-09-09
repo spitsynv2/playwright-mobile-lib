@@ -18,16 +18,9 @@ function activeSessionLogs(capabilities) {
   return SESSION_LOG_NAMES.filter((name) => !logLevelOff(name, levels[name]));
 }
 
-function platformKey(platform) {
-  return String(platform || '').toLowerCase() === 'android' ? 'android' : 'ios';
-}
-
-// Platform env wins over PWM_ORCHESTRATOR. Strip a query string. An empty value means no farm.
-function rawWsEndpoint(platform) {
-  const key = platformKey(platform);
-  const explicit = key === 'android' ? process.env.ANDROID_WS_ENDPOINT : process.env.IOS_WS_ENDPOINT;
-  if (explicit) return explicit.split('?')[0];
-  return (process.env.PWM_ORCHESTRATOR || '').split('?')[0];
+// Strip a query string. An empty value means no farm.
+function rawWsEndpoint() {
+  return (process.env.PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT || '').split('?')[0];
 }
 
 function decodeUserinfo(value) {
@@ -56,9 +49,9 @@ function splitEndpointCredentials(endpoint) {
   return { endpoint: parsed.toString(), username, password };
 }
 
-/** Return the farm WebSocket endpoint for a platform without credentials. */
-function resolveWsEndpoint(platform) {
-  return splitEndpointCredentials(rawWsEndpoint(platform)).endpoint;
+/** Return the remote WebSocket endpoint without credentials. */
+function resolveWsEndpoint() {
+  return splitEndpointCredentials(rawWsEndpoint()).endpoint;
 }
 
 // Do not add env fallbacks for capabilities. Each project declares its own device.
@@ -109,21 +102,9 @@ function basicAuthHeader(user, password) {
   return `Basic ${Buffer.from(`${user || ''}:${password || ''}`).toString('base64')}`;
 }
 
-/**
- * Build an optional Authorization header for an auth proxy.
- * Precedence: PWM_AUTH_HEADER, then PWM_AUTH_TOKEN, then user and password, then URL userinfo.
- */
-function buildAuthHeader(platform) {
-  const explicit = (process.env.PWM_AUTH_HEADER || '').trim();
-  if (explicit) return explicit;
-  const token = (process.env.PWM_AUTH_TOKEN || '').trim();
-  if (token) return `Bearer ${token}`;
-  const user = process.env.PWM_AUTH_USER;
-  const password = process.env.PWM_AUTH_PASSWORD;
-  if (user || password) {
-    return basicAuthHeader(user, password);
-  }
-  const fromUrl = splitEndpointCredentials(rawWsEndpoint(platform));
+/** Build an optional Authorization header from endpoint userinfo. */
+function buildAuthHeader() {
+  const fromUrl = splitEndpointCredentials(rawWsEndpoint());
   if (fromUrl.username || fromUrl.password) {
     return basicAuthHeader(fromUrl.username, fromUrl.password);
   }
@@ -131,10 +112,10 @@ function buildAuthHeader(platform) {
 }
 
 /** Build orchestrator connect headers from capabilities and optional auth. */
-function buildConnectHeaders(capabilities, platform, id = clientId) {
+function buildConnectHeaders(capabilities, id = clientId) {
   const headers = { 'x-pwm-capabilities': JSON.stringify(effectiveCapabilities(capabilities)) };
   if (id) headers['x-pwm-client-id'] = id;
-  const authorization = buildAuthHeader(platform);
+  const authorization = buildAuthHeader();
   if (authorization) headers['Authorization'] = authorization;
   return headers;
 }
@@ -146,13 +127,16 @@ const slowMoMs = (() => {
 
 // Must cover a cold container start. A reconnect can wait for a restart.
 const connectTimeoutMs = (() => {
-  const raw = parseInt(process.env.PWM_CONNECT_TIMEOUT_MS || process.env.IOS_CONNECT_TIMEOUT_MS || '', 10);
+  const raw = parseInt(
+    process.env.PLAYWRIGHT_MOBILE_CONNECT_TIMEOUT_MS || process.env.IOS_CONNECT_TIMEOUT_MS || '',
+    10,
+  );
   return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
 })();
 
 /** Build a client id that stays stable across a worker recycle. */
 function resolveClientId(env = process.env, ppid = process.ppid) {
-  const explicit = (env.PWM_CLIENT_ID || env.IOS_CLIENT_ID || '').trim();
+  const explicit = (env.PLAYWRIGHT_MOBILE_CLIENT_ID || env.IOS_CLIENT_ID || '').trim();
   if (explicit) return explicit;
   const parallel = (env.TEST_PARALLEL_INDEX || '').trim();
   if (parallel !== '') return `pwm-p${parallel}-r${ppid}`;

@@ -8,7 +8,7 @@ const { devices } = require('@playwright/test');
 const { selectDriver } = require('../src/platforms');
 const { patchContextNewPage, patchContextClose } = require('../src/core/context-patch');
 
-const ENDPOINT_KEYS = ['IOS_WS_ENDPOINT', 'ANDROID_WS_ENDPOINT', 'PWM_ORCHESTRATOR'];
+const ENDPOINT_KEYS = ['PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT'];
 
 // resolveWsEndpoint reads process.env per call, so a farm/local switch is env-scoped.
 function withEnv(vars, fn) {
@@ -28,7 +28,7 @@ function withEnv(vars, fn) {
 
 test('iOS farm runs accept deviceName, deviceUuid, or both', () => {
   const driver = selectDriver('iOS');
-  withEnv({ PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' }, () => {
+  withEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, () => {
     assert.deepEqual(
       driver.resolveDeviceInfo({ platformName: 'iOS', deviceName: 'iPhone XR' }),
       { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
@@ -64,7 +64,7 @@ test('iOS local runs do not require a device identity', () => {
 
 test('Android farm runs accept deviceName, deviceUuid, or both', () => {
   const driver = selectDriver('Android');
-  withEnv({ PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' }, () => {
+  withEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, () => {
     assert.deepEqual(
       driver.resolveDeviceInfo({ platformName: 'Android', deviceName: 'Pixel 3 XL' }),
       { deviceName: 'Pixel 3 XL', platformName: 'Android', osVersion: '' },
@@ -163,7 +163,7 @@ test('iOS falls back to a phone preset on a local run', () => {
 
 test('iOS leaves the viewport to the device on a farm run', () => {
   const driver = selectDriver('iOS');
-  for (const env of [{ IOS_WS_ENDPOINT: 'ws://farm:7777/safari' }, { PWM_ORCHESTRATOR: 'ws://farm:7777' }]) {
+  for (const env of [{ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'ws://farm:7777' }]) {
     assert.deepEqual(withEnv(env, () => driver.resolvePreset({ deviceName: 'not a device' })), {});
   }
 });
@@ -171,7 +171,10 @@ test('iOS leaves the viewport to the device on a farm run', () => {
 test('iOS resolves a known device the same way on both run modes', () => {
   const driver = selectDriver('iOS');
   const local = withEnv({}, () => driver.resolvePreset({ deviceName: 'iphone xr' }));
-  const farm = withEnv({ IOS_WS_ENDPOINT: 'ws://farm:7777/safari' }, () => driver.resolvePreset({ deviceName: 'iphone xr' }));
+  const farm = withEnv(
+    { PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'ws://farm:7777/sessions' },
+    () => driver.resolvePreset({ deviceName: 'iphone xr' }),
+  );
   assert.equal(local.userAgent, devices['iPhone XR'].userAgent);
   assert.equal(farm.userAgent, local.userAgent);
 });
@@ -388,26 +391,6 @@ test('Android clears browser data before launch only when asked', async () => {
 
   assert.equal(await cleared(), false, 'the profile survives by default');
   assert.equal(await cleared({ resetBrowserData: 'true' }), true);
-});
-
-test('a tab whose close never settles does not block the rest of the sweep', async () => {
-  const saved = process.env.PWM_TAB_CLOSE_TIMEOUT_MS;
-  process.env.PWM_TAB_CLOSE_TIMEOUT_MS = '50';
-  try {
-    const launched = new FakePage('about:blank');
-    const hung = new FakePage('https://hung.example/', () => new Promise(() => {}));
-    const context = fakeContext([launched, hung]);
-    const driver = await launchContext(context);
-    const popup = await context.newPage();
-
-    await driver.onContextTeardown(context);
-
-    assert.equal(popup.isClosed(), true, 'a wedged tab does not strand the others');
-    assert.equal(hung.isClosed(), false, 'the wedged tab is reported, not waited on');
-  } finally {
-    if (saved === undefined) delete process.env.PWM_TAB_CLOSE_TIMEOUT_MS;
-    else process.env.PWM_TAB_CLOSE_TIMEOUT_MS = saved;
-  }
 });
 
 test('a consumer-created page is patched like the fixture page', async () => {

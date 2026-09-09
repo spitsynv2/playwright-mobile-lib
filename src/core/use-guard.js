@@ -8,7 +8,7 @@ const UNSUPPORTED_LAUNCH_OPTIONS = {
   headless: 'a device browser is always headed',
   channel: 'the device runs its installed browser build',
   launchOptions: 'the farm launches the device browser — use capabilities.args on Android',
-  connectOptions: 'the library owns the connection — point PWM_ORCHESTRATOR at the farm instead',
+  connectOptions: 'the library owns the connection — point PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT at the farm instead',
 };
 
 const warnedOptions = new Set();

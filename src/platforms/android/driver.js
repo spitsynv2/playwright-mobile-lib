@@ -22,10 +22,6 @@ const {
   buildSessionCapabilities,
 } = require('../../core/reporting');
 
-const adbHost = process.env.ADB_SERVER_HOST || '127.0.0.1';
-const adbPort = parseInt(process.env.ADB_SERVER_PORT || '5037', 10);
-const omitDriverInstall = process.env.ANDROID_OMIT_DRIVER_INSTALL === 'true';
-
 const DEFAULT_LOCAL_ANDROID_DEVICE = 'Pixel 7';
 
 const DEFAULT_ANDROID_BROWSING_MODE = 'public';
@@ -70,13 +66,8 @@ function isPrivateMode(mode) {
 }
 
 // Android context.close() drops the CDP socket only. A tab stays until this path closes it.
-const DEFAULT_TAB_CLOSE_TIMEOUT_MS = 5_000;
+const TAB_CLOSE_TIMEOUT_MS = 5_000;
 const LATE_TAB_SETTLE_MS = 250;
-
-function tabCloseTimeoutMs() {
-  const raw = parseInt(process.env.PWM_TAB_CLOSE_TIMEOUT_MS || '', 10);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TAB_CLOSE_TIMEOUT_MS;
-}
 
 function livePages(context) {
   if (typeof context.pages !== 'function') return [];
@@ -94,7 +85,7 @@ async function closeTab(page) {
   try {
     await Promise.race([
       closed,
-      new Promise((resolve) => { timer = setTimeout(resolve, tabCloseTimeoutMs()); }),
+      new Promise((resolve) => { timer = setTimeout(resolve, TAB_CLOSE_TIMEOUT_MS); }),
     ]);
   } finally {
     clearTimeout(timer);
@@ -219,40 +210,6 @@ function resolveAndroidDevicePreset(deviceName) {
     || {};
 }
 
-// Use ADB only when a serial or PWM_ANDROID_ADB is set.
-function useAdb(caps) {
-  return Boolean(caps.serial || process.env.ANDROID_SERIAL || process.env.PWM_ANDROID_ADB === 'true');
-}
-
-async function connectAdb(caps) {
-  const serial = caps.serial || process.env.ANDROID_SERIAL || '';
-  const list = await android.devices({ host: adbHost, port: adbPort, omitDriverInstall });
-  if (!list.length) {
-    throw new Error(
-      `No Android devices from ADB at ${adbHost}:${adbPort}. `
-      + 'Ensure the device is authorized and `adb devices` lists it.',
-    );
-  }
-  if (serial) {
-    const match = list.find((d) => d.serial() === serial);
-    if (!match) {
-      throw new Error(
-        `ANDROID_SERIAL=${serial} not found. Available: ${list.map((d) => d.serial()).join(', ')}`,
-      );
-    }
-    for (const d of list) {
-      if (d.serial() !== serial) await d.close();
-    }
-    return match;
-  }
-  if (list.length > 1) {
-    throw new Error(
-      `Multiple devices (${list.length}). Set ANDROID_SERIAL to one of: ${list.map((d) => d.serial()).join(', ')}`,
-    );
-  }
-  return list[0];
-}
-
 /** Parse the Android and Chrome versions from a Chromium user agent. */
 function parseChromiumVersions(userAgent) {
   const ua = typeof userAgent === 'string' ? userAgent : '';
@@ -315,11 +272,8 @@ const driver = {
       return android.connect(wsEndpoint, {
         timeout: connectTimeoutMs,
         slowMo: slowMoMs,
-        headers: buildConnectHeaders(caps, 'Android'),
+        headers: buildConnectHeaders(caps),
       });
-    }
-    if (useAdb(caps)) {
-      return connectAdb(caps);
     }
     return chromium.launch({ slowMo: slowMoMs });
   },
@@ -356,7 +310,7 @@ const driver = {
     if (typeof connection.newContext === 'function') return connection;
     throw new Error(
       'The `browser` fixture is not available on an Android device run — the connection is an '
-      + 'AndroidDevice (farm run, or an ADB run pinned by capabilities.serial / ANDROID_SERIAL), '
+      + 'AndroidDevice from the device farm, '
       + 'not a Browser. Use `context` / `page`, `context.newPage()` for a second tab, or the '
       + '`request` fixture for API calls.',
     );
@@ -367,9 +321,8 @@ const driver = {
     if (typeof connection.launchBrowser !== 'function') {
       throw new Error(
         'The `device` fixture requires an Android device run — this worker is a local pre-flight '
-        + 'Chromium, which has no device behind it. Pin a connected device with '
-        + 'capabilities.serial / ANDROID_SERIAL, or point the run at the farm '
-        + '(PWM_ORCHESTRATOR / ANDROID_WS_ENDPOINT).',
+        + 'Chromium, which has no device behind it. Point the run at the farm with '
+        + 'PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT.',
       );
     }
     return makeDeviceProxy(connection);
@@ -431,13 +384,13 @@ const driver = {
     if (sweep) await sweep();
   },
 
-  async createPage(context, { deviceInfo, testInfo } = {}) {
+  async createPage(context, { deviceInfo } = {}) {
     // launchBrowser() already opened a tab. newPage() would leave that tab and miss incognito.
     const existing = typeof context.pages === 'function' ? context.pages() : [];
     const page = existing[0] || await context.newPage();
     ensureAndroidPrototypesPatched(page);
 
-    // A local or ADB run has no bridge. The RPC fails and sessionId stays empty.
+    // A local run has no bridge. The RPC fails and sessionId stays empty.
     let sessionId = '';
     let resolvedDeviceInfo = deviceInfo || { platformName: 'Android' };
     try {
@@ -459,8 +412,8 @@ const driver = {
       sessionId = await page.bridge.getSessionId();
     } catch {}
 
-    // A pre-flight has no bridge or adb, so derive both versions from the preset
-    // UA. A device/ADB run keeps its live values and is not touched here.
+    // A pre-flight has no bridge, so derive both versions from the preset UA.
+    // A device run keeps its live values and is not touched here.
     if (preflightContexts.has(context)) {
       const preset = resolveAndroidDevicePreset(resolvedDeviceInfo.deviceName);
       const { osVersion, browserVersion: chromeVersion } = parseChromiumVersions(preset && preset.userAgent);

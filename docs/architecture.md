@@ -110,16 +110,14 @@ Where the test runs depends on the environment, not on the test code.
 - No endpoint set. The driver launches a local browser: WebKit on iOS, Chromium
   on Android. This is the pre-flight path. It emulates the requested device.
 - An endpoint set. The driver connects to a remote session endpoint.
-  `PWM_ORCHESTRATOR` is the shared session URL. `IOS_WS_ENDPOINT` and
-  `ANDROID_WS_ENDPOINT` override it per platform.
+  `PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT` is the shared session URL.
 
 Capabilities travel as a connect header to the remote service. Authentication
 travels as an `Authorization` connect header. Credentials do not remain in the
 endpoint URL.
 
-`src/core/capabilities.js` owns this resolution: the endpoint, the auth
-precedence, the connect timeout, and the stable client id used to pin a device
-across reconnects.
+`src/core/capabilities.js` owns the endpoint, URL authentication, connect
+timeout, and stable client identifier.
 
 ## Device operations
 

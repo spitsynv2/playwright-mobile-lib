@@ -133,8 +133,6 @@ export interface Capabilities extends AndroidLaunchCapabilities {
   deviceName?: IOSDeviceName;
   /** Remote device UUID: UDID on iOS, ADB serial on Android. For a remote run, set this, `deviceName`, or both. */
   deviceUuid?: string;
-  /** Android device serial for direct ADB selection (or set `ANDROID_SERIAL`). For a farm run, use `deviceUuid` instead. */
-  serial?: string;
   /**
    * Tab mode. The default is `private` on iOS and `public` on Android.
    * On Android, `private` is experimental. An unrecognized mode throws when the session starts.

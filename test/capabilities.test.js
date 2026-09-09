@@ -12,13 +12,7 @@ const {
 } = require('../src/core/capabilities');
 
 const CONNECT_ENV = [
-  'PWM_ORCHESTRATOR',
-  'IOS_WS_ENDPOINT',
-  'ANDROID_WS_ENDPOINT',
-  'PWM_AUTH_HEADER',
-  'PWM_AUTH_TOKEN',
-  'PWM_AUTH_USER',
-  'PWM_AUTH_PASSWORD',
+  'PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT',
 ];
 
 function withConnectEnv(values, run) {
@@ -37,6 +31,13 @@ function withConnectEnv(values, run) {
 
 function decodeBasic(header) {
   return Buffer.from(header.replace(/^Basic /, ''), 'base64').toString();
+}
+
+function endpointWithCredentials(username, password) {
+  const endpoint = new URL('wss://orch.example.com:7465/sessions');
+  endpoint.username = username;
+  endpoint.password = password;
+  return endpoint.toString();
 }
 
 test('resolves booleans unchanged', () => {
@@ -102,77 +103,51 @@ test('rejects a negative or non-integer idleTimeoutMs instead of dropping it ser
   }
 });
 
-test('uses PWM_ORCHESTRATOR as the full session endpoint for every platform', () => {
-  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://alice:secret@orch.example.com:7465/sessions' }, () => {
+test('uses PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT for every platform', () => {
+  withConnectEnv({
+    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: endpointWithCredentials('test-user', 'test-password'),
+  }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/sessions');
-    assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'alice:secret');
+    assert.equal(decodeBasic(buildConnectHeaders({}).Authorization), 'test-user:test-password');
   });
 });
 
 test('percent-decodes userinfo so reserved characters survive the URL', () => {
-  withConnectEnv({ IOS_WS_ENDPOINT: 'wss://alice:s%40c%3Aret@orch.example.com:7465/sessions' }, () => {
-    assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
-    assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'alice:s@c:ret');
-  });
-});
-
-test('prefers explicit auth env over endpoint userinfo', () => {
-  const endpoint = 'wss://alice:secret@orch.example.com:7465/sessions';
-  withConnectEnv({ PWM_ORCHESTRATOR: endpoint, PWM_AUTH_TOKEN: 'tok' }, () => {
-    assert.equal(buildConnectHeaders({}, 'iOS').Authorization, 'Bearer tok');
-  });
-  withConnectEnv({ PWM_ORCHESTRATOR: endpoint, PWM_AUTH_HEADER: 'Basic raw' }, () => {
-    assert.equal(buildConnectHeaders({}, 'iOS').Authorization, 'Basic raw');
-  });
-  withConnectEnv({ PWM_ORCHESTRATOR: endpoint, PWM_AUTH_USER: 'bob', PWM_AUTH_PASSWORD: 'pw' }, () => {
-    assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'bob:pw');
-  });
-});
-
-test('keeps basic auth from env on an endpoint without userinfo', () => {
   withConnectEnv({
-    PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/sessions',
-    PWM_AUTH_USER: 'alice',
-    PWM_AUTH_PASSWORD: 'secret',
+    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: endpointWithCredentials('test-user', 'test-p@ss:word'),
   }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
-    assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'alice:secret');
+    assert.equal(decodeBasic(buildConnectHeaders({}).Authorization), 'test-user:test-p@ss:word');
   });
 });
 
 test('sends no Authorization when no credentials are configured', () => {
-  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/sessions' }, () => {
-    assert.equal(buildConnectHeaders({}, 'iOS').Authorization, undefined);
+  withConnectEnv({
+    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://orch.example.com:7465/sessions',
+  }, () => {
+    assert.equal(buildConnectHeaders({}).Authorization, undefined);
   });
   withConnectEnv({}, () => {
     assert.equal(resolveWsEndpoint('iOS'), '');
-    assert.equal(buildConnectHeaders({}, 'iOS').Authorization, undefined);
+    assert.equal(buildConnectHeaders({}).Authorization, undefined);
   });
 });
 
-test('resolves credentials per platform endpoint override', () => {
+test('does not append a platform path to PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT', () => {
   withConnectEnv({
-    IOS_WS_ENDPOINT: 'wss://ios:pw1@orch.example.com:7465/sessions',
-    ANDROID_WS_ENDPOINT: 'wss://android:pw2@orch.example.com:7465/sessions',
+    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://orch.example.com:7465/sessions',
   }, () => {
-    assert.equal(decodeBasic(buildConnectHeaders({}, 'iOS').Authorization), 'ios:pw1');
-    assert.equal(decodeBasic(buildConnectHeaders({}, 'Android').Authorization), 'android:pw2');
-  });
-});
-
-test('does not append a platform path to PWM_ORCHESTRATOR', () => {
-  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/sessions' }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/sessions');
   });
-  withConnectEnv({ PWM_ORCHESTRATOR: 'wss://orch.example.com:7465/' }, () => {
+  withConnectEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://orch.example.com:7465/' }, () => {
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/');
   });
 });
 
-test('PWM_CLIENT_ID overrides auto identity', () => {
-  assert.equal(resolveClientId({ PWM_CLIENT_ID: 'run-fixed' }, 42), 'run-fixed');
+test('PLAYWRIGHT_MOBILE_CLIENT_ID overrides auto identity', () => {
+  assert.equal(resolveClientId({ PLAYWRIGHT_MOBILE_CLIENT_ID: 'run-fixed' }, 42), 'run-fixed');
   assert.equal(resolveClientId({ IOS_CLIENT_ID: 'legacy' }, 42), 'legacy');
 });
 

@@ -84,16 +84,15 @@ viewport.
 To run against real devices, set the remote session endpoint:
 
 ```bash
-PWM_ORCHESTRATOR=wss://orchestrator.example.com:7465/sessions \
+PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT=wss://orchestrator.example.com:7465/sessions \
   npx playwright test --project=ios-safari
 
-PWM_ORCHESTRATOR=wss://orchestrator.example.com:7465/sessions \
+PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT=wss://orchestrator.example.com:7465/sessions \
   npx playwright test --project=android-chrome
 ```
 
 Both projects use the same session URL. The value of
-`capabilities.platformName` selects the platform. A full `IOS_WS_ENDPOINT` or
-`ANDROID_WS_ENDPOINT` overrides the URL for that platform.
+`capabilities.platformName` selects the platform.
 
 ## Video on a pre-flight
 

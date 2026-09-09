@@ -49,7 +49,7 @@ const driver = {
     return webkit.connect(wsEndpoint, {
       timeout: connectTimeoutMs,
       slowMo: slowMoMs,
-      headers: buildConnectHeaders(caps, 'iOS'),
+      headers: buildConnectHeaders(caps),
     });
   },
 

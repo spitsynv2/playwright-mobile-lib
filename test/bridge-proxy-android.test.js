@@ -11,7 +11,7 @@ const {
 } = require('../src/platforms/android/bridge-proxy');
 const { withConnectEnv } = require('./helpers/connect-env');
 
-const FARM = { PWM_ORCHESTRATOR: 'wss://farm:7465/sessions' };
+const FARM = { PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' };
 
 // The Android bridge RPC is a sentinel string passed to page.evaluate, which
 // the Go bridge intercepts. This fake records payloads and can fail a set

@@ -91,8 +91,8 @@ device profile or its system settings:
 On remote devices, these launch options do not apply: `browserName`,
 `defaultBrowserType`, `headless`, `channel`, `launchOptions`, and
 `connectOptions`. Use `capabilities.platformName` to select the platform. Use
-`capabilities.args` for Android browser flags. Use `PWM_ORCHESTRATOR` for the
-connection.
+`capabilities.args` for Android browser flags. Use
+`PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT` for the connection.
 
 Runner-side `trace`, `screenshot`, `testIdAttribute`, `actionTimeout`, and
 `navigationTimeout` remain available on both platforms. Ordinary `use` context
@@ -124,8 +124,7 @@ request while a mid-test resize is not.
 
 The library reads `process.env` and does not load `.env` files itself. Load them
 in the consuming project before importing `playwright-mobile-lib`. Connection
-paths, timeouts, and ADB settings load during module initialization. For
-example:
+Connection settings load during module initialization. For example:
 
 ```js
 require('dotenv').config();
@@ -134,35 +133,18 @@ const { test, expect } = require('playwright-mobile-lib');
 
 | Variable | Purpose |
 | --- | --- |
-| `PWM_ORCHESTRATOR` | Full session WebSocket URL, e.g. `wss://orch.example.com:7465/sessions`. Platform comes from `capabilities.platformName`. May carry `user:pass@` userinfo. Leave unset for local runs. |
-| `IOS_WS_ENDPOINT` | Full iOS WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for iOS. |
-| `ANDROID_WS_ENDPOINT` | Full Android WebSocket endpoint. Overrides `PWM_ORCHESTRATOR` for Android. |
-| `PWM_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. Defaults to `120000`. The connection fixture timeout is this value plus 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
-| `PWM_CLIENT_ID` | Stable `x-pwm-client-id` used for device pinning across reconnects. When absent, the default id uses `TEST_PARALLEL_INDEX` plus the runner PID so Playwright worker recycles keep the same pin. Otherwise a unique id is generated once per worker process. The legacy `IOS_CLIENT_ID` is still accepted. |
-| `PWM_TAB_CLOSE_TIMEOUT_MS` | Android: how long a single tab close may take during a sweep before the run moves on. Defaults to `5000`. |
-| `PWM_AUTH_HEADER` | Complete `Authorization` header value. Highest auth precedence. |
-| `PWM_AUTH_TOKEN` | Bearer token used when `PWM_AUTH_HEADER` is empty. |
-| `PWM_AUTH_USER` | Basic-auth username used when neither raw-header nor bearer auth is set. |
-| `PWM_AUTH_PASSWORD` | Basic-auth password paired with `PWM_AUTH_USER`. |
+| `PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT` | Full session WebSocket URL, for example, `wss://orch.example.com:7465/sessions`. `capabilities.platformName` selects the platform. The URL can contain `user:pass@` user information. Leave this variable unset for local runs. |
+| `PLAYWRIGHT_MOBILE_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. The default is `120000`. The connection fixture adds 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
+| `PLAYWRIGHT_MOBILE_CLIENT_ID` | Stable `x-pwm-client-id` for device selection across reconnects. If absent, the default uses `TEST_PARALLEL_INDEX` and the runner process identifier. The legacy `IOS_CLIENT_ID` is still accepted. |
 | `PLAYWRIGHT_SLOW_MO_MS` | Non-negative delay between Playwright operations in milliseconds. Defaults to `0`. |
-| `ANDROID_SERIAL` | Direct-ADB device serial used when no WebSocket endpoint is configured. |
-| `PWM_ANDROID_ADB` | Set exactly to `true` to select a direct ADB device without a serial. Exactly one device must be available. |
-| `ADB_SERVER_HOST` / `ADB_SERVER_PORT` | Direct-ADB server address. Defaults to `127.0.0.1:5037`. |
-| `ANDROID_OMIT_DRIVER_INSTALL` | Set exactly to `true` to skip Playwright's Android driver installation in direct-ADB mode. |
 
-Use the authentication variables when the remote service requires an
-`Authorization` header. The library sends this header on both platforms. The
-library removes credentials from the endpoint URL before the connection.
-Precedence is `PWM_AUTH_HEADER`, `PWM_AUTH_TOKEN`, `PWM_AUTH_USER` with
-`PWM_AUTH_PASSWORD`, and then userinfo in the endpoint URL.
-
-Userinfo is the shorthand form of the same Basic credentials:
+Put Basic authentication credentials in the endpoint URL:
 
 ```bash
-PWM_ORCHESTRATOR=wss://alice:secret@orch.example.com:7465/sessions
+PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT="wss://${ORCHESTRATOR_USER}:${ORCHESTRATOR_PASSWORD}@orch.example.com:7465/sessions"
 ```
 
-The library strips `alice:secret@` before connecting and sends it as
+The library strips the user information before connection and sends it as
 `Authorization: Basic …`. Percent-encode reserved characters in the password
-(`@` as `%40`, `:` as `%3A`). Prefer `PWM_AUTH_USER` / `PWM_AUTH_PASSWORD` when
-the password is awkward to encode or the URL would end up in shell history.
+(`@` as `%40`, `:` as `%3A`). Keep this URL in an ignored `.env` file or a CI
+secret store.
