@@ -50,6 +50,23 @@ function captureWarnings() {
   return { warnings, restore() { console.warn = original; } };
 }
 
+test('parseWebKitVersions reads the iOS and Safari versions Playwright WebKit reports', () => {
+  // A real WebKit preset UA. The iOS token and the Safari Version token differ,
+  // and both move between Playwright releases, so the pre-flight version must be
+  // derived from this string rather than hard-coded.
+  const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
+    + 'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
+  assert.deepEqual(driver.parseWebKitVersions(ua), {
+    osVersion: '17.5',
+    browserVersion: '26.0',
+  });
+});
+
+test('parseWebKitVersions returns empty strings for a missing or unparsable user agent', () => {
+  assert.deepEqual(driver.parseWebKitVersions(undefined), { osVersion: '', browserVersion: '' });
+  assert.deepEqual(driver.parseWebKitVersions('not a ua'), { osVersion: '', browserVersion: '' });
+});
+
 test('createContext merges preset and extra options and blocks device-only context APIs', async () => {
   let receivedOptions;
   const context = { async newPage() { return makeFullPage(); } };

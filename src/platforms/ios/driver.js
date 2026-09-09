@@ -1,7 +1,7 @@
 /** Connects WebKit to the orchestrator or launches it locally. */
 const { webkit, devices } = require('@playwright/test');
 
-const { resolveIOSDevicePreset, resolveIOSVersion } = require('./custom-devices');
+const { resolveIOSDevicePreset } = require('./custom-devices');
 const {
   attachSessionCapabilities,
   attachDeviceLabel,
@@ -23,6 +23,23 @@ const { recordAction } = require('../../core/telemetry');
 
 // Fallback Playwright preset when the requested device name is unknown.
 const DEFAULT_LOCAL_IOS_DEVICE = 'iPhone 16 Plus';
+
+/**
+ * Parse the iOS and Safari versions from a WebKit user agent, e.g.
+ * "...CPU iPhone OS 17_5 like Mac OS X... Version/26.0 ... Safari/604.1".
+ * A local pre-flight runs Playwright's bundled WebKit, whose reported versions
+ * change between Playwright releases, so this is read at run time instead of
+ * hard-coded in the device catalog.
+ */
+function parseWebKitVersions(userAgent) {
+  const ua = typeof userAgent === 'string' ? userAgent : '';
+  const osMatch = /OS (\d+(?:_\d+)+)/.exec(ua);
+  const safariMatch = /Version\/(\d+(?:\.\d+)*)/.exec(ua);
+  return {
+    osVersion: osMatch ? osMatch[1].replace(/_/g, '.') : '',
+    browserVersion: safariMatch ? safariMatch[1] : '',
+  };
+}
 
 const driver = {
   name: 'iOS',
@@ -130,13 +147,21 @@ const driver = {
     } catch {}
 
     // A real device reports the live OS version through the bridge. A local
-    // pre-flight has no bridge session, so fall back to the emulated device's
-    // catalog OS version. Without this the reporter shows "Platform: iOS" with
-    // no version for a pre-flight, while a device run shows "Platform: iOS 27.0".
-    if (!resolvedDeviceInfo.osVersion && resolvedDeviceInfo.deviceName) {
-      const catalogVersion = resolveIOSVersion(resolvedDeviceInfo.deviceName);
-      if (catalogVersion) {
-        resolvedDeviceInfo = { ...resolvedDeviceInfo, osVersion: catalogVersion };
+    // pre-flight runs Playwright's bundled WebKit, so report the iOS and Safari
+    // versions that WebKit actually presents, read from the resolved device
+    // preset's user agent. This tracks the installed Playwright build instead of
+    // a hard-coded catalog value, and turns a bare "Platform: iOS" into
+    // "Browser: Safari 26.0 / Platform: iOS 17.5" for a pre-flight run.
+    if (!resolvedDeviceInfo.osVersion) {
+      const preset = resolveIOSDevicePreset(resolvedDeviceInfo.deviceName, devices)
+        || resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices);
+      const { osVersion, browserVersion } = parseWebKitVersions(preset && preset.userAgent);
+      if (osVersion || browserVersion) {
+        resolvedDeviceInfo = {
+          ...resolvedDeviceInfo,
+          ...(osVersion ? { osVersion } : {}),
+          ...(browserVersion ? { browserVersion } : {}),
+        };
       }
     }
 
@@ -164,3 +189,4 @@ const driver = {
 };
 
 module.exports = driver;
+module.exports.parseWebKitVersions = parseWebKitVersions;
