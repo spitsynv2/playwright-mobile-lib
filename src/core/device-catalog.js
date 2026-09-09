@@ -32,25 +32,23 @@ function mergePreset(basePreset, overridePreset = {}) {
 }
 
 /**
- * Build alias, version, and definition maps from a JSON devices config.
- * An entry can set extends, override, aliases, and an OS version key.
+ * Build alias and definition maps from a JSON devices config.
+ * An entry can set extends, override, and aliases.
  */
-function buildCatalog(config, versionKey) {
+function buildCatalog(config) {
   const entries = (config && config.devices) || {};
   const aliases = {};
-  const versions = {};
   const definitions = {};
   for (const [name, rawEntry] of Object.entries(entries)) {
     const entry = rawEntry || {};
     for (const alias of entry.aliases || []) {
       aliases[normalizeDeviceName(alias)] = name;
     }
-    if (versionKey && entry[versionKey]) versions[name] = entry[versionKey];
     if (entry.extends || entry.override) {
       definitions[name] = { extends: entry.extends, override: entry.override };
     }
   }
-  return { aliases, versions, definitions };
+  return { aliases, definitions };
 }
 
 function buildCustomDevices(playwrightDevices, definitions) {
@@ -82,28 +80,8 @@ function resolvePreset(deviceName, playwrightDevices, catalog) {
   return findByNormalizedDeviceName(merged, deviceName) || null;
 }
 
-function resolveCanonicalName(deviceName, catalog) {
-  const normalized = normalizeDeviceName(deviceName);
-  if (!normalized) return '';
-  if (catalog.aliases[normalized]) return catalog.aliases[normalized];
-  const named = { ...catalog.definitions, ...catalog.versions };
-  for (const name of Object.keys(named)) {
-    if (normalizeDeviceName(name) === normalized) return name;
-  }
-  return String(deviceName || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-/** Return the OS version for deviceName, or null. */
-function resolveVersion(deviceName, catalog) {
-  const key = resolveCanonicalName(deviceName, catalog);
-  return catalog.versions[key]
-    || findByNormalizedDeviceName(catalog.versions, deviceName)
-    || null;
-}
-
 module.exports = {
   buildCatalog,
   getDeviceCatalog,
   resolvePreset,
-  resolveVersion,
 };

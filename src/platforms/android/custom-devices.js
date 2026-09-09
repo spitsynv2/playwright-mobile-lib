@@ -2,7 +2,7 @@
 const catalogConfig = require('./custom-devices.json');
 const { buildCatalog, resolvePreset } = require('../../core/device-catalog');
 
-const catalog = buildCatalog(catalogConfig, 'androidVersion');
+const catalog = buildCatalog(catalogConfig);
 
 /**
  * Resolves an Android device preset from the custom catalog or Playwright devices.
