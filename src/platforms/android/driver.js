@@ -253,7 +253,28 @@ async function connectAdb(caps) {
   return list[0];
 }
 
+/**
+ * Parse the Android and Chrome versions from a Chromium user agent, e.g.
+ * "...Linux; Android 14; Pixel 7... Chrome/145.0.7632.6 Mobile Safari/537.36".
+ * A local pre-flight runs Playwright's bundled Chromium, whose Chrome version
+ * tracks the installed Playwright build; the Android OS token is frozen per
+ * device model in Playwright's descriptors.
+ */
+function parseChromiumVersions(userAgent) {
+  const ua = typeof userAgent === 'string' ? userAgent : '';
+  const osMatch = /Android (\d+(?:\.\d+)*)/.exec(ua);
+  const chromeMatch = /Chrome\/(\d+(?:\.\d+)*)/.exec(ua);
+  return {
+    osVersion: osMatch ? osMatch[1] : '',
+    browserVersion: chromeMatch ? chromeMatch[1] : '',
+  };
+}
+
 const contextBrowserVersion = new WeakMap();
+
+// Local pre-flight (chromium.launch) contexts. Reporting versions are derived
+// from the preset user agent for these only; real device/ADB runs are untouched.
+const preflightContexts = new WeakSet();
 
 // ArtifactsRecorder skips launchBrowser() contexts. Capture screenshots in onPageTeardown.
 const contextsWithoutArtifactRail = new WeakSet();
@@ -407,6 +428,7 @@ const driver = {
     });
     patchContextNewPage(context, ensureAndroidPrototypesPatched);
     if (video) installPreflightVideoCapture(context, testInfo, video.mode);
+    preflightContexts.add(context);
     return context;
   },
 
@@ -443,11 +465,27 @@ const driver = {
     try {
       sessionId = await page.bridge.getSessionId();
     } catch {}
-    if (sessionId && testInfo) {
-      const reportingCapabilities = buildSessionCapabilities('Android', resolvedDeviceInfo);
-      attachSessionCapabilities(sessionId, reportingCapabilities);
-      attachDeviceLabel(resolvedDeviceInfo.deviceName);
+
+    // A real Android device carries both an Android version (bridge) and a
+    // Chrome version (adb). A local pre-flight has neither source, so derive
+    // both from the resolved device preset's Chromium user agent. A real
+    // device/ADB run keeps its live values and is never touched here.
+    if (preflightContexts.has(context)) {
+      const preset = resolveAndroidDevicePreset(resolvedDeviceInfo.deviceName);
+      const { osVersion, browserVersion: chromeVersion } = parseChromiumVersions(preset && preset.userAgent);
+      resolvedDeviceInfo = {
+        ...resolvedDeviceInfo,
+        ...(osVersion ? { osVersion } : {}),
+        ...(chromeVersion ? { browserVersion: chromeVersion } : {}),
+      };
     }
+
+    // Attach for both device and pre-flight runs so the reporter shows accurate
+    // Browser/Platform data in either mode. sessionId is empty on a pre-flight;
+    // the reporter still records the attached capabilities.
+    const reportingCapabilities = buildSessionCapabilities('Android', resolvedDeviceInfo);
+    attachSessionCapabilities(sessionId, reportingCapabilities);
+    attachDeviceLabel(resolvedDeviceInfo.deviceName);
     return page;
   },
 
@@ -467,3 +505,4 @@ const driver = {
 };
 
 module.exports = driver;
+module.exports.parseChromiumVersions = parseChromiumVersions;
