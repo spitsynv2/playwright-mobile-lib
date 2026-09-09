@@ -83,22 +83,22 @@ test('rejects an unknown browsing mode instead of silently defaulting', () => {
   );
 });
 
-test('passes a non-negative integer idleTimeoutMs through to the header', () => {
-  assert.equal(effectiveCapabilities({ platformName: 'iOS', idleTimeoutMs: 60000 }).idleTimeoutMs, 60000);
-  assert.equal(effectiveCapabilities({ idleTimeoutMs: 0 }).idleTimeoutMs, 0);
+test('passes a non-negative integer sessionIdleTimeoutMs through to the header', () => {
+  assert.equal(effectiveCapabilities({ platformName: 'iOS', sessionIdleTimeoutMs: 60000 }).sessionIdleTimeoutMs, 60000);
+  assert.equal(effectiveCapabilities({ sessionIdleTimeoutMs: 0 }).sessionIdleTimeoutMs, 0);
 });
 
-test('leaves an unset idleTimeoutMs to the orchestrator default', () => {
+test('leaves an unset sessionIdleTimeoutMs to the orchestrator default', () => {
   assert.doesNotThrow(() => effectiveCapabilities({ platformName: 'iOS' }));
-  assert.doesNotThrow(() => effectiveCapabilities({ idleTimeoutMs: undefined }));
-  assert.doesNotThrow(() => effectiveCapabilities({ idleTimeoutMs: null }));
+  assert.doesNotThrow(() => effectiveCapabilities({ sessionIdleTimeoutMs: undefined }));
+  assert.doesNotThrow(() => effectiveCapabilities({ sessionIdleTimeoutMs: null }));
 });
 
-test('rejects a negative or non-integer idleTimeoutMs instead of dropping it server-side', () => {
+test('rejects a negative or non-integer sessionIdleTimeoutMs instead of dropping it server-side', () => {
   for (const bad of [-1, 1.5, '1000', NaN, Infinity]) {
     assert.throws(
-      () => effectiveCapabilities({ platformName: 'iOS', idleTimeoutMs: bad }),
-      /idleTimeoutMs must be a non-negative integer/,
+      () => effectiveCapabilities({ platformName: 'iOS', sessionIdleTimeoutMs: bad }),
+      /sessionIdleTimeoutMs must be a non-negative integer/,
     );
   }
 });

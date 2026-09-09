@@ -138,23 +138,23 @@ export interface Capabilities extends AndroidLaunchCapabilities {
    * On Android, `private` is experimental. An unrecognized mode throws when the session starts.
    */
   browsingMode?: BrowsingMode | (string & {});
-  /** iOS: skip Safari history/data cleanup when the bridge starts. */
-  skipSafariCleanup?: GateFlag;
-  /** Close the tab after each test. iOS closes the native tab, and Android closes context tabs at launch and before the context closes. */
-  closeTabAfterTest?: GateFlag;
+  /** iOS: run Safari history/data cleanup when the bridge starts. Defaults to enabled. */
+  safariStartupCleanupEnabled?: GateFlag;
+  /** Close the tabs the session opened after each test. iOS closes the native tabs, and Android closes context tabs at launch and before the context closes. */
+  closeOpenedTabsAfterTest?: GateFlag;
   /** Android: clear the browser package data before each launch. Off by default. */
-  resetBrowserData?: GateFlag;
-  /** iOS: bridge nav-kick retry gate. Defaults to disabled. */
-  navKickEnabled?: GateFlag;
-  /** iOS: bridge click-nav retry gate. Defaults to disabled. */
-  clickNavRetriesEnabled?: GateFlag;
+  resetBrowserDataAfterTest?: GateFlag;
+  /** iOS: explicit-navigation recovery gate. Reissues a stuck explicit navigation. Defaults to disabled. */
+  explicitNavigationRecoveryEnabled?: GateFlag;
+  /** iOS: click-navigation retap recovery gate. Repeats a trusted tap after a stalled click navigation. Defaults to disabled. */
+  clickNavigationRetapRecoveryEnabled?: GateFlag;
   /** Remote session log levels. Android uses `bridge` and `pwserver`, and `inspector` is iOS-only. */
   logLevels?: Partial<Record<SessionLogName, LogLevel>>;
   /**
    * Idle timeout in milliseconds for this remote device session.
    * Omit for the service default. `0` disables the timeout. Pass a non-negative integer.
    */
-  idleTimeoutMs?: number;
+  sessionIdleTimeoutMs?: number;
 }
 
 /** Worker-scoped options added by this library. */

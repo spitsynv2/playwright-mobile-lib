@@ -333,10 +333,10 @@ const driver = {
     const mode = normalizeBrowsingMode(caps.browsingMode);
     if (typeof connection.launchBrowser === 'function') {
       const pkg = caps.pkg || 'com.android.chrome';
-      const pruneTabsEnabled = gateFlag(caps.closeTabAfterTest) !== false;
+      const pruneTabsEnabled = gateFlag(caps.closeOpenedTabsAfterTest) !== false;
       await connection.shell(`am force-stop ${pkg}`);
       // Restored tabs with no CDP target stay hidden from a sweep. Only pm clear removes them.
-      if (gateFlag(caps.resetBrowserData) === true) {
+      if (gateFlag(caps.resetBrowserDataAfterTest) === true) {
         try {
           await connection.shell(`pm clear ${pkg}`);
         } catch (error) {

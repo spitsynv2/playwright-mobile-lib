@@ -366,12 +366,12 @@ test('a test that closes the context itself sweeps its tabs first', async () => 
   assert.equal(context.pagesAtClose, 0, 'no tab reaches the close that would strand it');
 });
 
-test('Android leaves tabs alone when closeTabAfterTest is off', async () => {
+test('Android leaves tabs alone when closeOpenedTabsAfterTest is off', async () => {
   const launched = new FakePage('about:blank');
   const restored = new FakePage('https://a.example/');
   const context = fakeContext([restored, launched]);
 
-  const driver = await launchContext(context, { closeTabAfterTest: 'false' });
+  const driver = await launchContext(context, { closeOpenedTabsAfterTest: 'false' });
   await driver.onContextTeardown(context);
   await context.close();
 
@@ -390,7 +390,7 @@ test('Android clears browser data before launch only when asked', async () => {
   };
 
   assert.equal(await cleared(), false, 'the profile survives by default');
-  assert.equal(await cleared({ resetBrowserData: 'true' }), true);
+  assert.equal(await cleared({ resetBrowserDataAfterTest: 'true' }), true);
 });
 
 test('a consumer-created page is patched like the fixture page', async () => {

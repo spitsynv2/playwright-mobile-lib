@@ -71,12 +71,12 @@ function assertBrowsingMode(value) {
   );
 }
 
-// Reject a negative or non-integer idleTimeoutMs. The orchestrator drops an invalid value.
-function assertIdleTimeoutMs(value) {
+// Reject a negative or non-integer sessionIdleTimeoutMs. The orchestrator drops an invalid value.
+function assertSessionIdleTimeoutMs(value) {
   if (value === undefined || value === null) return;
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new Error(
-      'playwright-mobile-lib: capabilities.idleTimeoutMs must be a non-negative integer of '
+      'playwright-mobile-lib: capabilities.sessionIdleTimeoutMs must be a non-negative integer of '
       + `milliseconds (0 disables the orchestrator idle timeout), got ${JSON.stringify(value)}.`,
     );
   }
@@ -85,7 +85,7 @@ function assertIdleTimeoutMs(value) {
 function effectiveCapabilities(capabilities) {
   const caps = capabilities || {};
   assertBrowsingMode(caps.browsingMode);
-  assertIdleTimeoutMs(caps.idleTimeoutMs);
+  assertSessionIdleTimeoutMs(caps.sessionIdleTimeoutMs);
   return caps;
 }
 

@@ -35,7 +35,7 @@ const androidCapabilities: Capabilities = {
   platformName: 'Android',
   deviceName: 'Pixel 7',
   browsingMode: 'single-tab-public',
-  closeTabAfterTest: true,
+  closeOpenedTabsAfterTest: true,
   args: ['--mute-audio'],
   pkg: 'com.android.chrome',
   acceptDownloads: true,
@@ -72,10 +72,10 @@ const iosCapabilities: Capabilities = {
   deviceName: 'iPhone 16 Plus',
   deviceUuid: 'udid',
   browsingMode: 'single-tab-private',
-  skipSafariCleanup: true,
-  closeTabAfterTest: false,
-  navKickEnabled: true,
-  clickNavRetriesEnabled: false,
+  safariStartupCleanupEnabled: true,
+  closeOpenedTabsAfterTest: false,
+  explicitNavigationRecoveryEnabled: true,
+  clickNavigationRetapRecoveryEnabled: false,
   logLevels: { bridge: 'debug', pwserver: 'off', inspector: 'info' },
 };
 
@@ -85,10 +85,10 @@ const otherDevice: Capabilities = { platformName: 'iOS', deviceName: 'iPhone 13 
 // Gate flags accept the string forms an env variable produces.
 const envDrivenGates: Capabilities = {
   platformName: 'iOS',
-  closeTabAfterTest: process.env.CLOSE_TAB_AFTER_TEST === 'true' ? 'true' : 'false',
-  skipSafariCleanup: 'true',
-  navKickEnabled: false,
-  clickNavRetriesEnabled: true,
+  closeOpenedTabsAfterTest: process.env.CLOSE_OPENED_TABS_AFTER_TEST === 'true' ? 'true' : 'false',
+  safariStartupCleanupEnabled: 'true',
+  explicitNavigationRecoveryEnabled: false,
+  clickNavigationRetapRecoveryEnabled: true,
 };
 
 // An env variable reaches browsingMode without a cast; a typo throws at runtime.
