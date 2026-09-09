@@ -146,22 +146,18 @@ const driver = {
       sessionId = await page.bridge.getSessionId();
     } catch {}
 
-    // A real device reports the live OS version through the bridge. A local
-    // pre-flight runs Playwright's bundled WebKit, so report the iOS and Safari
-    // versions that WebKit actually presents, read from the resolved device
-    // preset's user agent. This tracks the installed Playwright build instead of
-    // a hard-coded catalog value, and turns a bare "Platform: iOS" into
-    // "Browser: Safari 26.0 / Platform: iOS 17.5" for a pre-flight run.
+    // A real device reports the live OS version through the bridge and carries
+    // only a platform version (no browser version). To match that shape on a
+    // local pre-flight, report the WebKit/Safari version (e.g. 26.0) as the
+    // platform version. It is read from the resolved preset's user agent, so it
+    // tracks the installed Playwright build. The preset's iOS OS token (e.g.
+    // 17.5) is frozen per device model and misleading, so it is not used.
     if (!resolvedDeviceInfo.osVersion) {
       const preset = resolveIOSDevicePreset(resolvedDeviceInfo.deviceName, devices)
         || resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices);
-      const { osVersion, browserVersion } = parseWebKitVersions(preset && preset.userAgent);
-      if (osVersion || browserVersion) {
-        resolvedDeviceInfo = {
-          ...resolvedDeviceInfo,
-          ...(osVersion ? { osVersion } : {}),
-          ...(browserVersion ? { browserVersion } : {}),
-        };
+      const { browserVersion } = parseWebKitVersions(preset && preset.userAgent);
+      if (browserVersion) {
+        resolvedDeviceInfo = { ...resolvedDeviceInfo, osVersion: browserVersion };
       }
     }
 
