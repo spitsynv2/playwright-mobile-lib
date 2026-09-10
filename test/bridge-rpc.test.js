@@ -30,7 +30,7 @@ test('hasFarmBridge follows the platform endpoint', async () => {
     assert.equal(hasFarmBridge('iOS'), false);
     assert.equal(hasFarmBridge('Android'), false);
   });
-  await withConnectEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, () => {
+  await withConnectEnv({ PLAYWRIGHT_MOBILE_HUB_URL: 'wss://farm:7465/sessions' }, () => {
     assert.equal(hasFarmBridge('iOS'), true);
     assert.equal(hasFarmBridge('Android'), true);
   });
@@ -50,7 +50,7 @@ test('bridgeCall throws a dedicated error on a local pre-flight and does not eva
 
 test('bridgeCall serializes the op through the sentinel on a farm run', async () => {
   const page = fakePage();
-  await withConnectEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, async () => {
+  await withConnectEnv({ PLAYWRIGHT_MOBILE_HUB_URL: 'wss://farm:7465/sessions' }, async () => {
     const result = await bridgeCall(page, 'getDeviceInfo', { verbose: true }, 'Android');
     assert.deepEqual(result, { ok: true, op: 'getDeviceInfo', args: { verbose: true } });
   });

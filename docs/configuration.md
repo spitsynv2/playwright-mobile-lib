@@ -92,7 +92,7 @@ On remote devices, these launch options do not apply: `browserName`,
 `defaultBrowserType`, `headless`, `channel`, `launchOptions`, and
 `connectOptions`. Use `capabilities.platformName` to select the platform. Use
 `capabilities.args` for Android browser flags. Use
-`PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT` for the connection.
+`PLAYWRIGHT_MOBILE_HUB_URL` for the connection.
 
 Runner-side `trace`, `screenshot`, `testIdAttribute`, `actionTimeout`, and
 `navigationTimeout` remain available on both platforms. Ordinary `use` context
@@ -133,7 +133,7 @@ const { test, expect } = require('playwright-mobile-lib');
 
 | Variable | Purpose |
 | --- | --- |
-| `PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT` | Full session WebSocket URL, for example, `wss://orch.example.com:7465/sessions`. `capabilities.platformName` selects the platform. The URL can contain `user:pass@` user information. Leave this variable unset for local runs. |
+| `PLAYWRIGHT_MOBILE_HUB_URL` | Full session WebSocket URL, for example, `wss://orch.example.com:7465/sessions`. `capabilities.platformName` selects the platform. The URL can contain `user:pass@` user information. Leave this variable unset for local runs. |
 | `PLAYWRIGHT_MOBILE_CONNECT_TIMEOUT_MS` | Remote connect timeout in milliseconds. The default is `120000`. The connection fixture adds 30 seconds. The legacy `IOS_CONNECT_TIMEOUT_MS` is still accepted. |
 | `PLAYWRIGHT_MOBILE_CLIENT_ID` | Stable `x-pwm-client-id` for device selection across reconnects. If absent, the default uses `TEST_PARALLEL_INDEX` and the runner process identifier. The legacy `IOS_CLIENT_ID` is still accepted. |
 | `PLAYWRIGHT_SLOW_MO_MS` | Non-negative delay between Playwright operations in milliseconds. Defaults to `0`. |
@@ -142,7 +142,7 @@ const { test, expect } = require('playwright-mobile-lib');
 Put Basic authentication credentials in the endpoint URL:
 
 ```bash
-PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT="wss://${ORCHESTRATOR_USER}:${ORCHESTRATOR_PASSWORD}@orch.example.com:7465/sessions"
+PLAYWRIGHT_MOBILE_HUB_URL="wss://${HUB_USER}:${HUB_PASSWORD}@orch.example.com:7465/sessions"
 ```
 
 The library strips the user information before connection and sends it as

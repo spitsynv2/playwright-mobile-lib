@@ -110,7 +110,7 @@ Where the test runs depends on the environment, not on the test code.
 - No endpoint set. The driver launches a local browser: WebKit on iOS, Chromium
   on Android. This is the pre-flight path. It emulates the requested device.
 - An endpoint set. The driver connects to a remote session endpoint.
-  `PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT` is the shared session URL.
+  `PLAYWRIGHT_MOBILE_HUB_URL` is the shared session URL.
 
 Capabilities travel as a connect header to the remote service. Authentication
 travels as an `Authorization` connect header. Credentials do not remain in the

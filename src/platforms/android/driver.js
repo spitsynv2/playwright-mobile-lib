@@ -322,7 +322,7 @@ const driver = {
       throw new Error(
         'The `device` fixture requires an Android device run — this worker is a local pre-flight '
         + 'Chromium, which has no device behind it. Point the run at the farm with '
-        + 'PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT.',
+        + 'PLAYWRIGHT_MOBILE_HUB_URL.',
       );
     }
     return makeDeviceProxy(connection);

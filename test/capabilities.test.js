@@ -12,7 +12,7 @@ const {
 } = require('../src/core/capabilities');
 
 const CONNECT_ENV = [
-  'PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT',
+  'PLAYWRIGHT_MOBILE_HUB_URL',
 ];
 
 function withConnectEnv(values, run) {
@@ -45,7 +45,7 @@ test('resolves booleans unchanged', () => {
   assert.equal(parseEnabledFlag(false), false);
 });
 
-test('resolves the string forms the orchestrator accepts', () => {
+test('resolves the string forms the mobile hub accepts', () => {
   assert.equal(parseEnabledFlag('true'), true);
   assert.equal(parseEnabledFlag('TRUE'), true);
   assert.equal(parseEnabledFlag(' true '), true);
@@ -88,7 +88,7 @@ test('passes a non-negative integer sessionIdleTimeoutMs through to the header',
   assert.equal(effectiveCapabilities({ sessionIdleTimeoutMs: 0 }).sessionIdleTimeoutMs, 0);
 });
 
-test('leaves an unset sessionIdleTimeoutMs to the orchestrator default', () => {
+test('leaves an unset sessionIdleTimeoutMs to the mobile hub default', () => {
   assert.doesNotThrow(() => effectiveCapabilities({ platformName: 'iOS' }));
   assert.doesNotThrow(() => effectiveCapabilities({ sessionIdleTimeoutMs: undefined }));
   assert.doesNotThrow(() => effectiveCapabilities({ sessionIdleTimeoutMs: null }));
@@ -103,9 +103,9 @@ test('rejects a negative or non-integer sessionIdleTimeoutMs instead of dropping
   }
 });
 
-test('uses PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT for every platform', () => {
+test('uses PLAYWRIGHT_MOBILE_HUB_URL for every platform', () => {
   withConnectEnv({
-    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: endpointWithCredentials('test-user', 'test-password'),
+    PLAYWRIGHT_MOBILE_HUB_URL: endpointWithCredentials('test-user', 'test-password'),
   }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/sessions');
@@ -115,7 +115,7 @@ test('uses PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT for every platform', () => {
 
 test('percent-decodes userinfo so reserved characters survive the URL', () => {
   withConnectEnv({
-    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: endpointWithCredentials('test-user', 'test-p@ss:word'),
+    PLAYWRIGHT_MOBILE_HUB_URL: endpointWithCredentials('test-user', 'test-p@ss:word'),
   }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(decodeBasic(buildConnectHeaders({}).Authorization), 'test-user:test-p@ss:word');
@@ -124,7 +124,7 @@ test('percent-decodes userinfo so reserved characters survive the URL', () => {
 
 test('sends no Authorization when no credentials are configured', () => {
   withConnectEnv({
-    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://orch.example.com:7465/sessions',
+    PLAYWRIGHT_MOBILE_HUB_URL: 'wss://orch.example.com:7465/sessions',
   }, () => {
     assert.equal(buildConnectHeaders({}).Authorization, undefined);
   });
@@ -134,14 +134,14 @@ test('sends no Authorization when no credentials are configured', () => {
   });
 });
 
-test('does not append a platform path to PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT', () => {
+test('does not append a platform path to PLAYWRIGHT_MOBILE_HUB_URL', () => {
   withConnectEnv({
-    PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://orch.example.com:7465/sessions',
+    PLAYWRIGHT_MOBILE_HUB_URL: 'wss://orch.example.com:7465/sessions',
   }, () => {
     assert.equal(resolveWsEndpoint('iOS'), 'wss://orch.example.com:7465/sessions');
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/sessions');
   });
-  withConnectEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://orch.example.com:7465/' }, () => {
+  withConnectEnv({ PLAYWRIGHT_MOBILE_HUB_URL: 'wss://orch.example.com:7465/' }, () => {
     assert.equal(resolveWsEndpoint('Android'), 'wss://orch.example.com:7465/');
   });
 });

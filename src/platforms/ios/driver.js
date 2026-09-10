@@ -1,4 +1,4 @@
-/** Connects WebKit to the orchestrator or launches it locally. */
+/** Connects WebKit to the mobile hub or launches it locally. */
 const { webkit, devices } = require('@playwright/test');
 
 const { resolveIOSDevicePreset } = require('./custom-devices');

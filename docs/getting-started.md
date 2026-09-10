@@ -84,10 +84,10 @@ viewport.
 To run against real devices, set the remote session endpoint:
 
 ```bash
-PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT=wss://orchestrator.example.com:7465/sessions \
+PLAYWRIGHT_MOBILE_HUB_URL=wss://mobile-hub.example.com:7465/sessions \
   npx playwright test --project=ios-safari
 
-PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT=wss://orchestrator.example.com:7465/sessions \
+PLAYWRIGHT_MOBILE_HUB_URL=wss://mobile-hub.example.com:7465/sessions \
   npx playwright test --project=android-chrome
 ```
 

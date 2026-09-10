@@ -8,7 +8,7 @@ const { devices } = require('@playwright/test');
 const { selectDriver } = require('../src/platforms');
 const { patchContextNewPage, patchContextClose } = require('../src/core/context-patch');
 
-const ENDPOINT_KEYS = ['PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT'];
+const ENDPOINT_KEYS = ['PLAYWRIGHT_MOBILE_HUB_URL'];
 
 // resolveWsEndpoint reads process.env per call, so a farm/local switch is env-scoped.
 function withEnv(vars, fn) {
@@ -28,7 +28,7 @@ function withEnv(vars, fn) {
 
 test('iOS farm runs accept deviceName, deviceUuid, or both', () => {
   const driver = selectDriver('iOS');
-  withEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, () => {
+  withEnv({ PLAYWRIGHT_MOBILE_HUB_URL: 'wss://farm:7465/sessions' }, () => {
     assert.deepEqual(
       driver.resolveDeviceInfo({ platformName: 'iOS', deviceName: 'iPhone XR' }),
       { deviceName: 'iPhone XR', platformName: 'iOS', osVersion: '' },
@@ -64,7 +64,7 @@ test('iOS local runs do not require a device identity', () => {
 
 test('Android farm runs accept deviceName, deviceUuid, or both', () => {
   const driver = selectDriver('Android');
-  withEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, () => {
+  withEnv({ PLAYWRIGHT_MOBILE_HUB_URL: 'wss://farm:7465/sessions' }, () => {
     assert.deepEqual(
       driver.resolveDeviceInfo({ platformName: 'Android', deviceName: 'Pixel 3 XL' }),
       { deviceName: 'Pixel 3 XL', platformName: 'Android', osVersion: '' },
@@ -163,7 +163,7 @@ test('iOS falls back to a phone preset on a local run', () => {
 
 test('iOS leaves the viewport to the device on a farm run', () => {
   const driver = selectDriver('iOS');
-  for (const env of [{ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'ws://farm:7777' }]) {
+  for (const env of [{ PLAYWRIGHT_MOBILE_HUB_URL: 'ws://farm:7777' }]) {
     assert.deepEqual(withEnv(env, () => driver.resolvePreset({ deviceName: 'not a device' })), {});
   }
 });
@@ -172,7 +172,7 @@ test('iOS resolves a known device the same way on both run modes', () => {
   const driver = selectDriver('iOS');
   const local = withEnv({}, () => driver.resolvePreset({ deviceName: 'iphone xr' }));
   const farm = withEnv(
-    { PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'ws://farm:7777/sessions' },
+    { PLAYWRIGHT_MOBILE_HUB_URL: 'ws://farm:7777/sessions' },
     () => driver.resolvePreset({ deviceName: 'iphone xr' }),
   );
   assert.equal(local.userAgent, devices['iPhone XR'].userAgent);

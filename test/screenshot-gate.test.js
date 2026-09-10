@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-process.env.PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT = 'ws://test/sessions';
+process.env.PLAYWRIGHT_MOBILE_HUB_URL = 'ws://test/sessions';
 
 const { installForegroundScreenshotGate } = require('../src/platforms/ios/screenshot-gate');
 

@@ -12,7 +12,7 @@ const test = base.extend({
   /** iOS only. Reopen page in this browsing mode before the test body. */
   reopenPageInModeBeforeTest: [undefined, { option: true }],
 
-  /** Desired capabilities for this project. The orchestrator matches a free device. */
+  /** Desired capabilities for this project. The mobile hub matches a free device. */
   capabilities: [defaultCapabilities, { option: true, scope: 'worker' }],
 
   /** Extra context options for the fixture context. */

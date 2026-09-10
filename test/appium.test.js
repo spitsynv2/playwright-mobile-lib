@@ -13,7 +13,7 @@ const {
 const { withConnectEnv } = require('./helpers/connect-env');
 
 const SENTINEL = '__pwm_bridge_call__:';
-const FARM = { PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' };
+const FARM = { PLAYWRIGHT_MOBILE_HUB_URL: 'wss://farm:7465/sessions' };
 
 // A fake iOS bridge page: page.evaluate(sentinel) is the in-process RPC. The
 // page tracks the current input mode and hit-test flag so setInputMode /

@@ -20,7 +20,7 @@ function enabledSessionLogNames(capabilities) {
 
 // Strip a query string. An empty value means no farm.
 function rawWsEndpoint() {
-  return (process.env.PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT || '').split('?')[0];
+  return (process.env.PLAYWRIGHT_MOBILE_HUB_URL || '').split('?')[0];
 }
 
 function decodeUserinfo(value) {
@@ -61,7 +61,7 @@ const BROWSING_MODES = new Set([
   'public', 'private', 'single-tab-public', 'single-tab-private', 'single-tab',
 ]);
 
-// Reject an unknown browsingMode. The orchestrator silently uses its default for a bad value.
+// Reject an unknown browsingMode. The mobile hub silently uses its default for a bad value.
 function assertBrowsingMode(value) {
   if (value === undefined || value === null || value === '') return;
   if (BROWSING_MODES.has(String(value).trim().toLowerCase())) return;
@@ -71,13 +71,13 @@ function assertBrowsingMode(value) {
   );
 }
 
-// Reject a negative or non-integer sessionIdleTimeoutMs. The orchestrator drops an invalid value.
+// Reject a negative or non-integer sessionIdleTimeoutMs. The mobile hub drops an invalid value.
 function assertSessionIdleTimeoutMs(value) {
   if (value === undefined || value === null) return;
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new Error(
       'playwright-mobile-lib: capabilities.sessionIdleTimeoutMs must be a non-negative integer of '
-      + `milliseconds (0 disables the orchestrator idle timeout), got ${JSON.stringify(value)}.`,
+      + `milliseconds (0 disables the mobile hub idle timeout), got ${JSON.stringify(value)}.`,
     );
   }
 }
@@ -89,7 +89,7 @@ function effectiveCapabilities(capabilities) {
   return caps;
 }
 
-// Parse boolean and the quoted true or false forms. Match the orchestrator.
+// Parse boolean and the quoted true or false forms. Match the mobile hub.
 function parseEnabledFlag(value) {
   if (typeof value === 'boolean') return value;
   const v = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
@@ -111,7 +111,7 @@ function buildAuthHeader() {
   return '';
 }
 
-/** Build orchestrator connect headers from capabilities and optional auth. */
+/** Build mobile hub connect headers from capabilities and optional auth. */
 function buildConnectHeaders(capabilities, id = clientId) {
   const headers = { 'x-pwm-capabilities': JSON.stringify(effectiveCapabilities(capabilities)) };
   if (id) headers['x-pwm-client-id'] = id;

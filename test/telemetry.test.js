@@ -110,7 +110,7 @@ test('telemetry serialization cannot change a successful action result', async (
 });
 
 test('reports bridge and Appium proxy methods at their public abstraction', async () => {
-  await withConnectEnv({ PLAYWRIGHT_MOBILE_ORCHESTRATOR_ENDPOINT: 'wss://farm:7465/sessions' }, async () => {
+  await withConnectEnv({ PLAYWRIGHT_MOBILE_HUB_URL: 'wss://farm:7465/sessions' }, async () => {
     const actions = [];
     reporting.attachAction = (action) => actions.push(action);
     const page = {
