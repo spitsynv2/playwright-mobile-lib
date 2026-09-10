@@ -124,7 +124,7 @@ request while a mid-test resize is not.
 
 The library reads `process.env` and does not load `.env` files itself. Load them
 in the consuming project before importing `playwright-mobile-lib`. Connection
-Connection settings load during module initialization. For example:
+settings load during module initialization. For example:
 
 ```js
 require('dotenv').config();
