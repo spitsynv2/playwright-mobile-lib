@@ -24,7 +24,7 @@ npm install
 The minimum supported Playwright version is `1.58.2`. Newer versions can have
 compatibility problems.
 
-Node.js 22 or newer is required. Node 24 LTS is recommended. The
+Node.js 18 or newer is required. Node 24 LTS is recommended. The
 `playwright` and `@playwright/test` versions must match. For a remote device
 run, use the Playwright version that the remote device service supports.
 
