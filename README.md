@@ -31,32 +31,6 @@ test('opens a page', async ({ page }) => {
 | Fixtures, platform-specific and blocked APIs, and extending `test` | [docs/api.md](docs/api.md) |
 | Design and contributor module map | [docs/architecture.md](docs/architecture.md) |
 
-## Publishing the beta release
-
-Use the package version `0.1.0`. Keep the version in `package.json` and both
-root version fields in `package-lock.json` in sync.
-
-The package currently has `"private": true`. Before public publication, remove
-that field and configure the repository secret `NPM_TOKEN` with npm publish
-access. Run the manual **Publish package to NPM** workflow from the release
-commit. The workflow runs the package checks before publication.
-
-For a manual release, run the same checks before publishing:
-
-```bash
-npm ci
-npm run lint
-npm run test
-npm run test:coverage
-npm run test:pack
-npm publish --access public
-```
-
-After publication, install the release with `playwright-mobile-lib@0.1.0`.
-Update Git-pinned consumers to the release commit and regenerate their
-lockfiles. Keep each lockfile dependency version consistent with its resolved
-commit.
-
 ## License
 
 Playwright Mobile Library is released under version 2.0 of the
