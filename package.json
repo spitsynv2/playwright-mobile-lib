@@ -1,6 +1,6 @@
 {
   "name": "playwright-mobile-lib",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Cross-platform Playwright mobile fixture for iOS Safari and Android Chrome.",
   "private": true,
   "main": "dist/index.js",

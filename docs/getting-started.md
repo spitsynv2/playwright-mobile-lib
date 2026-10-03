@@ -1,5 +1,7 @@
 # Getting started
 
+**Current release: 0.1.0 beta.** The public API can change between beta releases.
+
 ## Install
 
 This package is not on the public npm registry. Install it from the Git
