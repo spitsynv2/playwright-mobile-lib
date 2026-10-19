@@ -93,11 +93,30 @@ function assertSessionIdleTimeoutMs(value) {
   }
 }
 
+const LANDSCAPE_SUFFIX = /[\s_-]+landscape\s*$/i;
+const warnedLandscapeNames = new Set();
+
+// The mobile hub matches the plain device name and rotates the device from orientation only.
+function stripLandscapeSuffix(deviceName) {
+  if (typeof deviceName !== 'string' || !LANDSCAPE_SUFFIX.test(deviceName)) return deviceName;
+  const plain = deviceName.replace(LANDSCAPE_SUFFIX, '');
+  if (!warnedLandscapeNames.has(deviceName)) {
+    warnedLandscapeNames.add(deviceName);
+    console.warn(
+      `playwright-mobile-lib: capabilities.deviceName '${deviceName}' is treated as '${plain}'. `
+      + "Set capabilities.orientation: 'landscape' to rotate the device.",
+    );
+  }
+  return plain;
+}
+
 function effectiveCapabilities(capabilities) {
-  const caps = capabilities || {};
+  let caps = capabilities || {};
   assertBrowsingMode(caps.browsingMode);
   assertOrientation(caps.orientation);
   assertSessionIdleTimeoutMs(caps.sessionIdleTimeoutMs);
+  const deviceName = stripLandscapeSuffix(caps.deviceName);
+  if (deviceName !== caps.deviceName) caps = { ...caps, deviceName };
   if (caps.orientation === undefined || caps.orientation === null || caps.orientation === '') {
     return { ...caps, orientation: 'portrait' };
   }
