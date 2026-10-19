@@ -74,7 +74,9 @@ module.exports = defineConfig({
 ```
 
 The package does not read capabilities from the environment. Orientation is
-`portrait` unless you set `orientation`.
+`portrait` unless you set `orientation`. With `orientation: 'landscape'`, a local
+run uses the landscape preset of the device. Do not add `landscape` to
+`deviceName`. The package removes the suffix and prints a warning.
 
 The package does not load `.env` files. Load them in your project before you
 import the package. The package reads `PLAYWRIGHT_MOBILE_HUB_URL` when it

@@ -44,6 +44,8 @@ Platform and capabilities:
 - `selectDriver` maps `android` to Android, and `ios` or an empty value to iOS. Other values throw.
 - There are no environment fallbacks for capability fields. The default capability object is `{ platformName: 'iOS' }`.
 - An unknown `browsingMode` or `orientation` throws before the connect. An empty `orientation` is sent as `portrait`. The library sets no default `browsingMode`.
+- `effectiveCapabilities` removes a `landscape` suffix from `deviceName` and warns once for each name. The hub matches only the plain name and rotates the device only from `orientation`.
+- `resolvePreset(deviceInfo, capabilities)` returns the `<name> landscape` preset for `orientation: 'landscape'`. Without one, it swaps the viewport. iOS keeps the portrait `screen`. Android swaps `screen` too.
 - A hub run requires `deviceName` or `deviceUuid`.
 
 Connection:
