@@ -70,7 +70,7 @@ test('accepts every browsing mode the servers recognize', () => {
 });
 
 test('leaves an unset browsing mode to the server default', () => {
-  assert.deepEqual(effectiveCapabilities(undefined), {});
+  assert.deepEqual(effectiveCapabilities(undefined), { orientation: 'portrait' });
   assert.doesNotThrow(() => effectiveCapabilities({ platformName: 'iOS' }));
   assert.doesNotThrow(() => effectiveCapabilities({ browsingMode: '' }));
   assert.doesNotThrow(() => effectiveCapabilities({ browsingMode: undefined }));
@@ -87,8 +87,13 @@ test('accepts portrait and landscape orientations', () => {
   for (const orientation of ['portrait', 'landscape', ' Landscape ']) {
     assert.equal(effectiveCapabilities({ platformName: 'iOS', orientation }).orientation, orientation);
   }
-  assert.doesNotThrow(() => effectiveCapabilities({ orientation: '' }));
-  assert.doesNotThrow(() => effectiveCapabilities({ orientation: undefined }));
+});
+
+test('defaults an unset orientation to portrait', () => {
+  for (const orientation of [undefined, null, '']) {
+    assert.equal(effectiveCapabilities({ platformName: 'iOS', orientation }).orientation, 'portrait');
+  }
+  assert.equal(effectiveCapabilities({ platformName: 'Android' }).orientation, 'portrait');
 });
 
 test('rejects an unknown orientation instead of silently defaulting', () => {

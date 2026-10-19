@@ -142,7 +142,7 @@ export interface Capabilities extends AndroidLaunchCapabilities {
    * Device orientation applied when the bridge starts. Defaults to `portrait`.
    * A different orientation restarts the remote bridge. An unrecognized value throws when the session starts.
    */
-  orientation?: 'portrait' | 'landscape';
+  orientation?: 'portrait' | 'landscape' | (string & {});
   /** iOS: run Safari history/data cleanup when the bridge starts. Defaults to enabled. */
   safariStartupCleanupEnabled?: GateFlag;
   /** Close the tabs the session opened after each test. iOS closes the native tabs, and Android closes context tabs at launch and before the context closes. */

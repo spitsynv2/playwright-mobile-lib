@@ -98,6 +98,9 @@ function effectiveCapabilities(capabilities) {
   assertBrowsingMode(caps.browsingMode);
   assertOrientation(caps.orientation);
   assertSessionIdleTimeoutMs(caps.sessionIdleTimeoutMs);
+  if (caps.orientation === undefined || caps.orientation === null || caps.orientation === '') {
+    return { ...caps, orientation: 'portrait' };
+  }
   return caps;
 }
 
