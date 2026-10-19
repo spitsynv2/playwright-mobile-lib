@@ -83,6 +83,21 @@ test('rejects an unknown browsing mode instead of silently defaulting', () => {
   );
 });
 
+test('accepts portrait and landscape orientations', () => {
+  for (const orientation of ['portrait', 'landscape', ' Landscape ']) {
+    assert.equal(effectiveCapabilities({ platformName: 'iOS', orientation }).orientation, orientation);
+  }
+  assert.doesNotThrow(() => effectiveCapabilities({ orientation: '' }));
+  assert.doesNotThrow(() => effectiveCapabilities({ orientation: undefined }));
+});
+
+test('rejects an unknown orientation instead of silently defaulting', () => {
+  assert.throws(
+    () => effectiveCapabilities({ platformName: 'iOS', orientation: 'sideways' }),
+    /unknown capabilities.orientation 'sideways'/,
+  );
+});
+
 test('passes a non-negative integer sessionIdleTimeoutMs through to the header', () => {
   assert.equal(effectiveCapabilities({ platformName: 'iOS', sessionIdleTimeoutMs: 60000 }).sessionIdleTimeoutMs, 60000);
   assert.equal(effectiveCapabilities({ sessionIdleTimeoutMs: 0 }).sessionIdleTimeoutMs, 0);

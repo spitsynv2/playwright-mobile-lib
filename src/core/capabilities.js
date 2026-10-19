@@ -71,6 +71,17 @@ function assertBrowsingMode(value) {
   );
 }
 
+const ORIENTATIONS = new Set(['portrait', 'landscape']);
+
+// Reject an unknown orientation. The mobile hub silently uses portrait for a bad value.
+function assertOrientation(value) {
+  if (value === undefined || value === null || value === '') return;
+  if (ORIENTATIONS.has(String(value).trim().toLowerCase())) return;
+  throw new Error(
+    `playwright-mobile-lib: unknown capabilities.orientation '${value}'. Expected portrait or landscape.`,
+  );
+}
+
 // Reject a negative or non-integer sessionIdleTimeoutMs. The mobile hub drops an invalid value.
 function assertSessionIdleTimeoutMs(value) {
   if (value === undefined || value === null) return;
@@ -85,6 +96,7 @@ function assertSessionIdleTimeoutMs(value) {
 function effectiveCapabilities(capabilities) {
   const caps = capabilities || {};
   assertBrowsingMode(caps.browsingMode);
+  assertOrientation(caps.orientation);
   assertSessionIdleTimeoutMs(caps.sessionIdleTimeoutMs);
   return caps;
 }
