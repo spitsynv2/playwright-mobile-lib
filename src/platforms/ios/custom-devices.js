@@ -13,8 +13,8 @@ function getIOSDeviceCatalog(playwrightDevices) {
   return getDeviceCatalog(playwrightDevices, catalog.definitions);
 }
 
-function resolveIOSDevicePreset(deviceName, playwrightDevices) {
-  return resolvePreset(deviceName, playwrightDevices, catalog);
+function resolveIOSDevicePreset(deviceName, playwrightDevices, orientation) {
+  return resolvePreset(deviceName, playwrightDevices, catalog, { orientation });
 }
 
 module.exports = {

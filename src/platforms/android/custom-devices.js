@@ -8,8 +8,8 @@ const catalog = buildCatalog(catalogConfig);
  * Resolves an Android device preset from the custom catalog or Playwright devices.
  * @returns {object|null} Device preset, or null if the device is unknown.
  */
-function resolveAndroidDevicePreset(deviceName, playwrightDevices) {
-  return resolvePreset(deviceName, playwrightDevices, catalog);
+function resolveAndroidDevicePreset(deviceName, playwrightDevices, orientation) {
+  return resolvePreset(deviceName, playwrightDevices, catalog, { orientation, swapScreen: true });
 }
 
 module.exports = {

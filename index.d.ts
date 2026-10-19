@@ -28,11 +28,13 @@ type DeviceDescriptor = PlaywrightDevices[string];
  *
  * @param deviceName Device name or alias (e.g. `"iPhone 16 Plus"`, `"iphone xr"`).
  * @param playwrightDevices The Playwright `devices` catalog to extend.
+ * @param orientation `landscape` returns the `<name> landscape` preset, or the preset with a swapped viewport.
  * @returns The resolved preset, or `null` when the name is unknown.
  */
 export function resolveIOSDevicePreset(
   deviceName: string,
   playwrightDevices: PlaywrightDevices,
+  orientation?: 'portrait' | 'landscape',
 ): DeviceDescriptor | null;
 
 /**

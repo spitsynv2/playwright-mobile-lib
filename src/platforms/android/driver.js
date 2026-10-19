@@ -204,9 +204,9 @@ function buildLaunchBrowserOptions(caps) {
 /**
  * Resolves the local Chromium device preset from the capability device name.
  */
-function resolveAndroidDevicePreset(deviceName) {
-  return resolveCustomAndroidPreset(deviceName, devices)
-    || devices[DEFAULT_LOCAL_ANDROID_DEVICE]
+function resolveAndroidDevicePreset(deviceName, orientation) {
+  return resolveCustomAndroidPreset(deviceName, devices, orientation)
+    || resolveCustomAndroidPreset(DEFAULT_LOCAL_ANDROID_DEVICE, devices, orientation)
     || {};
 }
 
@@ -301,8 +301,8 @@ const driver = {
     };
   },
 
-  resolvePreset(deviceInfo) {
-    return resolveAndroidDevicePreset(deviceInfo.deviceName);
+  resolvePreset(deviceInfo, capabilities) {
+    return resolveAndroidDevicePreset(deviceInfo.deviceName, effectiveCapabilities(capabilities).orientation);
   },
 
   // A device run is an AndroidDevice. Only a local run is a Browser.

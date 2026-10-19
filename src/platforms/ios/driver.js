@@ -82,11 +82,12 @@ const driver = {
   },
 
   // On a real device the viewport is cosmetic. `setViewportSize` is blocked.
-  resolvePreset(deviceInfo) {
-    const preset = resolveIOSDevicePreset(deviceInfo.deviceName, devices);
+  resolvePreset(deviceInfo, capabilities) {
+    const { orientation } = effectiveCapabilities(capabilities);
+    const preset = resolveIOSDevicePreset(deviceInfo.deviceName, devices, orientation);
     if (preset) return preset;
     if (resolveWsEndpoint('iOS')) return {};
-    return resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices) || {};
+    return resolveIOSDevicePreset(DEFAULT_LOCAL_IOS_DEVICE, devices, orientation) || {};
   },
 
   resolveBrowser(connection) {

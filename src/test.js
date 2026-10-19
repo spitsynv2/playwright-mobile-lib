@@ -47,8 +47,8 @@ const test = base.extend({
     await use(_driver.resolveDeviceInfo(capabilities));
   }, { scope: 'worker' }],
 
-  devicePreset: [async ({ deviceInfo, _driver }, use) => {
-    await use(_driver.resolvePreset(deviceInfo));
+  devicePreset: [async ({ deviceInfo, capabilities, _driver }, use) => {
+    await use(_driver.resolvePreset(deviceInfo, capabilities));
   }, { scope: 'worker' }],
 
   context: async ({ _driver, _connection, devicePreset, extraContextOptions, capabilities }, use, testInfo) => {

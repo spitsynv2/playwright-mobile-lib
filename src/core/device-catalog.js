@@ -1,8 +1,5 @@
 /** Load a custom device catalog from a per-platform JSON file. */
-const {
-  normalizeDeviceName,
-  findByNormalizedDeviceName,
-} = require('./device-name');
+const { normalizeDeviceName } = require('./device-name');
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
@@ -72,12 +69,34 @@ function getDeviceCatalog(playwrightDevices, definitions) {
   };
 }
 
-/** Return the device descriptor for deviceName. Use aliases and custom devices. */
-function resolvePreset(deviceName, playwrightDevices, catalog) {
-  const merged = getDeviceCatalog(playwrightDevices, catalog.definitions);
+function findPresetName(merged, catalog, deviceName) {
   const alias = catalog.aliases[normalizeDeviceName(deviceName)];
-  if (alias && merged[alias]) return merged[alias];
-  return findByNormalizedDeviceName(merged, deviceName) || null;
+  if (alias && merged[alias]) return alias;
+  const requested = normalizeDeviceName(deviceName);
+  if (!requested) return null;
+  if (Object.prototype.hasOwnProperty.call(merged, deviceName)) return deviceName;
+  return Object.keys(merged).find((name) => normalizeDeviceName(name) === requested) || null;
+}
+
+// Real iOS Safari keeps portrait `screen` values in landscape. Android Chrome swaps them.
+function swapToLandscape(preset, swapScreen) {
+  const landscape = cloneValue(preset);
+  const flip = (size) => (size && size.height > size.width ? { ...size, width: size.height, height: size.width } : size);
+  if (landscape.viewport) landscape.viewport = flip(landscape.viewport);
+  if (swapScreen && landscape.screen) landscape.screen = flip(landscape.screen);
+  return landscape;
+}
+
+/**
+ * Return the device descriptor for deviceName. Use aliases and custom devices.
+ * A landscape orientation prefers the `<name> landscape` preset and else swaps the viewport.
+ */
+function resolvePreset(deviceName, playwrightDevices, catalog, { orientation, swapScreen = false } = {}) {
+  const merged = getDeviceCatalog(playwrightDevices, catalog.definitions);
+  const name = findPresetName(merged, catalog, deviceName);
+  if (!name) return null;
+  if (orientation !== 'landscape' || normalizeDeviceName(name).endsWith(' landscape')) return merged[name];
+  return merged[`${name} landscape`] || swapToLandscape(merged[name], swapScreen);
 }
 
 module.exports = {
