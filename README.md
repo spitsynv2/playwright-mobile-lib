@@ -1,8 +1,8 @@
 # playwright-mobile-lib
 
-**Current release: 0.1.0 beta.**
+**Current release: 0.1.0.**
 
-The public API can change between beta releases.
+The public API can change in later releases.
 
 Cross-platform Playwright fixtures for mobile web testing on real devices:
 

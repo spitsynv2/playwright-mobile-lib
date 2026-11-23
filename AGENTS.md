@@ -4,7 +4,7 @@ This file holds the canonical instructions for any AI coding agent that works in
 
 ## Purpose and scope
 
-`playwright-mobile-lib` is a public Apache-2.0 package. It gives one Playwright `test` with fixtures for iOS Safari and Android Chrome. With no hub URL, tests run in local WebKit or Chromium (pre-flight). With a hub URL, tests run on real devices through a remote session service. The package is in beta, and its public API can change.
+`playwright-mobile-lib` is a public Apache-2.0 package. It gives one Playwright `test` with fixtures for iOS Safari and Android Chrome. With no hub URL, tests run in local WebKit or Chromium (pre-flight). With a hub URL, tests run on real devices through a remote session service. The package is at version `0.1.0`, and its public API can change in later releases.
 
 This repository holds the library only. The iOS bridge, the Android bridge, the orchestrator, and the acceptance suites are separate repositories.
 
